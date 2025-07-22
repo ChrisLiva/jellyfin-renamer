@@ -1,0 +1,23 @@
+[project]
+name = "jellyfin-renamer"
+version = "0.1.0"
+description = "parses media, organizes files"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "guessit>=3.8.0",
+    "tqdm>=4.67.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+]
+
