@@ -2,15 +2,12 @@
 
 A Python tool to organize and rename movie and TV show files for Jellyfin media server. This tool automatically parses media information from filenames, creates organized folder structures, and processes audio to FLAC stereo format using FFmpeg.
 
-**✨ Now includes a beautiful Terminal User Interface (TUI) for interactive use!**
-
 Follows Jellyfin recommendations on media organization:
 https://jellyfin.org/docs/general/server/media/movies
 https://jellyfin.org/docs/general/server/media/shows
 
 ## Features
 
-- **🎬 Terminal User Interface (TUI)**: Beautiful interactive interface for easy media organization
 - **Command-Line Interface**: Direct CLI access for automation and scripting
 - **Smart Media Parsing**: Uses `guessit` library to extract movie/TV titles, years, resolution, and parts from filenames
 - **Jellyfin-Compatible Structure**: Creates organized folder structures that work well with Jellyfin
@@ -24,7 +21,7 @@ https://jellyfin.org/docs/general/server/media/shows
 ## Prerequisites
 
 - Python 3.13 or higher
-- FFmpeg installed and available in your PATH (for audio processing)
+- FFmpeg installed and available in your PATH
 - UV package manager (recommended) or pip
 
 ## Project Setup
@@ -83,145 +80,8 @@ cd jellyfin-renamer
 # Check if the main script runs
 python jellyfin-renamer.py --help
 
-# Check if TUI mode works
-python jellyfin-renamer.py --tui
-
 # Check if pytest is available
 python -m pytest --version
-```
-
-## Usage
-
-### 🎬 Interactive TUI Mode (Recommended)
-
-Launch the beautiful Terminal User Interface for an intuitive experience:
-
-```bash
-# Method 1: Using the main script
-python jellyfin-renamer.py --tui
-
-# Method 2: Using the dedicated TUI launcher
-python run_tui.py
-
-# Method 3: Using UV
-uv run python run_tui.py
-```
-
-The TUI provides:
-
-- **Visual directory selection** with built-in file browser
-- **Real-time file scanning** and selection
-- **Interactive configuration** with validation
-- **Beautiful progress bars** with live updates
-- **Error handling** with clear messages
-- **Keyboard shortcuts** for efficient navigation
-
-See [TUI_USAGE.md](TUI_USAGE.md) for detailed TUI documentation.
-
-### 📟 Command-Line Interface
-
-```bash
-python jellyfin-renamer.py <source_directory> <target_directory> [options]
-```
-
-#### Arguments
-
-- `source_directory`: Path to the directory containing your media files
-- `target_directory`: Path where you want the organized media to be saved
-
-#### Options
-
-- `--tui`: Launch interactive Terminal User Interface mode
-- `--content-type {movies,tv,auto}`: Type of content to process (default: auto)
-- `--downmix-audio`: Optional flag to process audio with FFmpeg (default: False)
-  - Converts audio to stereo FLAC format
-  - Applies EBU R128 loudness normalization with settings optimized for outdoor viewing:
-    - Integrated loudness: -14 LUFS
-    - True peak: -1.5 dBTP
-    - Loudness range: 9 LU
-
-#### Examples
-
-```bash
-# Interactive TUI mode (recommended for new users)
-python jellyfin-renamer.py --tui
-
-# CLI mode examples
-python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media
-python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media --downmix-audio
-python jellyfin-renamer.py /path/to/movies /path/to/jellyfin/movies --content-type movies
-python jellyfin-renamer.py /path/to/tv /path/to/jellyfin/tv --content-type tv
-
-# Using UV
-uv run python jellyfin-renamer.py --tui
-uv run python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media
-```
-
-## How It Works
-
-1. **Scanning**: The tool scans the source directory for video files (mp4, mkv, avi, mov, wmv, iso)
-2. **Content Detection**: Auto-detects whether files are movies or TV shows based on filename patterns
-3. **Parsing**: Uses `guessit` to extract media information from filenames
-4. **Grouping**: Groups files by title and year (movies) or series and season (TV shows)
-5. **Organizing**: Creates folder structures like `Movie Title (2023)/` or `Show Name/Season 01/`
-6. **Copying**: Copies files to their new locations with proper naming
-7. **Processing**: Optionally processes audio using FFmpeg (when `--downmix-audio` is used):
-   - Converts to stereo FLAC format
-   - Applies EBU R128 loudness normalization for consistent volume levels
-   - Preserves video and subtitle streams without re-encoding
-8. **Extras**: Organizes trailers, behind-the-scenes content, etc. into subfolders
-
-## Interface Comparison
-
-| Feature                | TUI Mode                          | CLI Mode                      |
-| ---------------------- | --------------------------------- | ----------------------------- |
-| **Ease of Use**        | ✅ Visual & Interactive           | ⚠️ Requires command knowledge |
-| **File Selection**     | ✅ Visual browser with checkboxes | ❌ Processes all files        |
-| **Real-time Feedback** | ✅ Live progress & validation     | ⚠️ Basic progress bars        |
-| **Error Handling**     | ✅ User-friendly dialogs          | ⚠️ Terminal error messages    |
-| **Directory Browsing** | ✅ Built-in tree browser          | ❌ Manual path entry          |
-| **Configuration**      | ✅ Visual forms with validation   | ⚠️ Command-line flags         |
-| **Automation**         | ❌ Interactive only               | ✅ Perfect for scripts        |
-| **Batch Processing**   | ⚠️ One session at a time          | ✅ Multiple concurrent runs   |
-
-**Recommendation**: Use TUI mode for manual organization and CLI mode for automation/scripting.
-
-## Supported Video Formats
-
-- MP4 (.mp4)
-- MKV (.mkv)
-- AVI (.avi)
-- MOV (.mov)
-- WMV (.wmv)
-- ISO (.iso)
-
-## Output Structure
-
-### Movies
-
-```
-Target Directory/Movies/
-├── Movie Title (2023)/
-│   ├── Movie Title (2023) - 1080p.mp4
-│   ├── Movie Title (2023) - 4K.mp4
-│   ├── trailers/
-│   │   └── Movie Title (2023) - Trailer.mp4
-│   └── behind the scenes/
-│       └── Movie Title (2023) - Featurette.mp4
-└── Another Movie (2022)/
-    └── Another Movie (2022) - 720p.mp4
-```
-
-### TV Shows
-
-```
-Target Directory/Shows/
-├── Show Name/
-│   ├── Season 01/
-│   │   ├── Show Name - S01E01 - Episode Title - 1080p.mp4
-│   │   └── Show Name - S01E02 - Episode Title - 720p.mp4
-│   └── Season 02/
-│       └── Show Name - S02E01 - Episode Title - 4K.mp4
 ```
 
 ## Running Tests
@@ -264,6 +124,95 @@ The test suite covers:
 - **Extension handling**: Complex filenames with multiple extensions
 - **Edge cases**: Special characters, numbers in titles, etc.
 
+## Usage
+
+### Command-Line Interface
+
+```bash
+python jellyfin-renamer.py <source_directory> <target_directory> [options]
+```
+
+#### Arguments
+
+- `source_directory`: Path to the directory containing your media files
+- `target_directory`: Path where you want the organized media to be saved
+
+#### Options
+
+- `--content-type {movies,tv,auto}`: Type of content to process (default: auto)
+- `--downmix-audio`: Optional flag to process audio with FFmpeg (default: False)
+  - Converts audio to stereo FLAC format
+  - Applies EBU R128 loudness normalization with settings optimized for outdoor viewing:
+    - Integrated loudness: -14 LUFS
+    - True peak: -1.5 dBTP
+    - Loudness range: 9 LU
+
+#### Examples
+
+```bash
+# Using UV (recommended)
+uv run python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media
+uv run python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media --downmix-audio
+uv run python jellyfin-renamer.py /path/to/movies /path/to/jellyfin/movies --content-type movies
+uv run python jellyfin-renamer.py /path/to/tv /path/to/jellyfin/tv --content-type tv
+
+# Using pip/venv
+python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media
+python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media --downmix-audio
+```
+
+## How It Works
+
+1. **Scanning**: The tool scans the source directory for video files (mp4, mkv, avi, mov, wmv, iso)
+2. **Content Detection**: Auto-detects whether files are movies or TV shows based on filename patterns
+3. **Parsing**: Uses `guessit` to extract media information from filenames
+4. **Grouping**: Groups files by title and year (movies) or series and season (TV shows)
+5. **Organizing**: Creates folder structures like `Movie Title (2023)/` or `Show Name/Season 01/`
+6. **Copying**: Copies files to their new locations with proper naming
+7. **Processing**: Optionally processes audio using FFmpeg (when `--downmix-audio` is used):
+   - Converts to stereo FLAC format
+   - Applies EBU R128 loudness normalization for consistent volume levels
+   - Preserves video and subtitle streams without re-encoding
+8. **Extras**: Organizes trailers, behind-the-scenes content, etc. into subfolders
+
+## Supported Video Formats
+
+- MP4 (.mp4)
+- MKV (.mkv)
+- AVI (.avi)
+- MOV (.mov)
+- WMV (.wmv)
+- ISO (.iso)
+
+## Output Structure
+
+### Movies
+
+```
+Target Directory/Movies/
+├── Movie Title (2023)/
+│   ├── Movie Title (2023) - 1080p.mp4
+│   ├── Movie Title (2023) - 4K.mp4
+│   ├── trailers/
+│   │   └── Movie Title (2023) - Trailer.mp4
+│   └── behind the scenes/
+│       └── Movie Title (2023) - Featurette.mp4
+└── Another Movie (2022)/
+    └── Another Movie (2022) - 720p.mp4
+```
+
+### TV Shows
+
+```
+Target Directory/Shows/
+├── Show Name/
+│   ├── Season 01/
+│   │   ├── Show Name - S01E01 - Episode Title - 1080p.mp4
+│   │   └── Show Name - S01E02 - Episode Title - 720p.mp4
+│   └── Season 02/
+│       └── Show Name - S02E01 - Episode Title - 4K.mp4
+```
+
 ## Validation and Quality Assurance
 
 ### 1. Pre-Processing Validation
@@ -274,7 +223,7 @@ Before running the tool on your entire media library:
 # Test with a small subset of files
 mkdir test_source test_target
 cp /path/to/your/media/*.mkv test_source/  # Copy a few files
-python jellyfin-renamer.py --tui  # Use TUI for easy testing
+python jellyfin-renamer.py test_source test_target
 ```
 
 ### 2. Output Validation
@@ -308,8 +257,6 @@ Monitor these metrics during processing:
 
 - **guessit>=3.8.0**: For parsing media information from filenames
 - **tqdm>=4.67.1**: For progress bars during processing
-- **textual>=0.54.0**: For the Terminal User Interface
-- **textual-dev>=0.54.0**: TUI development tools
 
 ### Development Dependencies
 
@@ -332,11 +279,10 @@ When using the `--downmix-audio` flag, the tool applies advanced audio processin
 
 ### Common Issues
 
-1. **TUI dependencies not available**: Install with `pip install textual textual-dev`
-2. **FFmpeg not found**: Ensure FFmpeg is installed and in your PATH
-3. **Permission errors**: Check file permissions on source and target directories
-4. **Disk space**: Ensure sufficient space for output files
-5. **Unsupported formats**: Check that your video files are in supported formats
+1. **FFmpeg not found**: Ensure FFmpeg is installed and in your PATH
+2. **Permission errors**: Check file permissions on source and target directories
+3. **Disk space**: Ensure sufficient space for output files
+4. **Unsupported formats**: Check that your video files are in supported formats
 
 ### Debug Mode
 
@@ -346,12 +292,6 @@ For detailed logging, you can modify the script to add debug output or run with 
 python -v jellyfin-renamer.py source target
 ```
 
-### Getting Help
-
-- **TUI Help**: Press F1 in the TUI for keyboard shortcuts and help
-- **CLI Help**: Run `python jellyfin-renamer.py --help`
-- **Detailed Guide**: See [TUI_USAGE.md](TUI_USAGE.md) for comprehensive TUI documentation
-
 ## Notes
 
 - Progress bars show the status of all operations
@@ -359,8 +299,3 @@ python -v jellyfin-renamer.py source target
 - The tool preserves original files and creates copies in the target directory
 - Audio processing settings are optimized for outdoor/projector viewing where ambient noise is higher
 - Mixed content processing automatically separates movies and TV shows into different directories
-- The TUI and CLI modes use identical processing engines for consistent results
-
----
-
-🎬 **Enjoy organizing your media files with the beautiful new TUI!** ✨

@@ -44,36 +44,10 @@ async def organize_mixed_content(source_dir, target_dir, downmix_audio=False):
         await organize_tv_shows(source_dir, shows_dir, downmix_audio)
 
 
-def run_tui():
-    """Run the TUI version of the application."""
-    try:
-        from tui import JellyfinRenamerApp
-
-        app = JellyfinRenamerApp()
-        app.run()
-    except ImportError:
-        print("Error: TUI dependencies not available.")
-        print("Please install with: pip install textual textual-dev")
-        return 1
-    except Exception as e:
-        print(f"Error running TUI: {e}")
-        return 1
-    return 0
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Organize media files for Jellyfin.")
-
-    # Add TUI mode argument
-    parser.add_argument(
-        "--tui",
-        action="store_true",
-        help="Launch interactive Terminal User Interface (TUI) mode",
-    )
-
-    # CLI arguments (made optional when using TUI)
-    parser.add_argument("source_dir", nargs="?", help="Source directory")
-    parser.add_argument("target_dir", nargs="?", help="Target directory")
+    parser.add_argument("source_dir", help="Source directory")
+    parser.add_argument("target_dir", help="Target directory")
     parser.add_argument(
         "--content-type",
         choices=["movies", "tv", "auto"],
@@ -86,22 +60,8 @@ if __name__ == "__main__":
         default=False,
         help="Downmix audio to stereo FLAC using FFmpeg (default: False)",
     )
-
     args = parser.parse_args()
 
-    # Check if TUI mode is requested
-    if args.tui:
-        import sys
-
-        sys.exit(run_tui())
-
-    # Validate CLI arguments
-    if not args.source_dir or not args.target_dir:
-        parser.error(
-            "source_dir and target_dir are required for CLI mode. Use --tui for interactive mode."
-        )
-
-    # Run CLI mode
     if args.content_type == "movies":
         asyncio.run(
             organize_movies(args.source_dir, args.target_dir, args.downmix_audio)
