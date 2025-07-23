@@ -1,0 +1,209 @@
+/* Jellyfin Renamer TUI Styles */
+
+Screen {
+    background: $background;
+}
+
+.main-container {
+    background: $surface;
+    border: thick $primary;
+    margin: 1;
+    padding: 1;
+}
+
+.title {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    background: $surface;
+    margin: 1;
+}
+
+.config-panel {
+    border: solid $accent;
+    margin: 1;
+    padding: 1;
+    height: auto;
+}
+
+.config-header {
+    text-style: bold;
+    color: $primary;
+    background: $surface;
+    text-align: center;
+}
+
+.file-panel {
+    border: solid $accent;
+    margin: 1;
+    padding: 1;
+    height: auto;
+}
+
+.action-panel {
+    border: solid $accent;
+    margin: 1;
+    padding: 1;
+    height: auto;
+}
+
+.directory-input {
+    margin: 1;
+    width: 100%;
+}
+
+.content-type-selector {
+    margin: 1;
+}
+
+.checkbox-container {
+    margin: 1;
+}
+
+.button-container {
+    margin: 1;
+    text-align: center;
+}
+
+Button {
+    margin: 0 1;
+    min-width: 16;
+}
+
+Button.primary {
+    background: $primary;
+    color: $text;
+}
+
+Button.secondary {
+    background: $accent;
+    color: $text;
+}
+
+Button.-active {
+    text-style: bold;
+}
+
+Input {
+    margin: 1;
+}
+
+.progress-container {
+    border: solid $primary;
+    margin: 1;
+    padding: 1;
+}
+
+.progress-overall {
+    margin: 1;
+}
+
+.progress-file {
+    margin: 1;
+}
+
+.log-panel {
+    border: solid $accent;
+    margin: 1;
+    padding: 1;
+    height: 10;
+}
+
+.status-info {
+    background: $surface;
+    text-align: center;
+    padding: 1;
+    color: $text;
+}
+
+.file-tree {
+    border: solid $accent;
+    margin: 1;
+    padding: 1;
+}
+
+.file-item {
+    padding: 0 1;
+}
+
+.file-item:hover {
+    background: $primary 30%;
+}
+
+.file-selected {
+    background: $primary;
+    color: $text;
+}
+
+.video-file {
+    color: $success;
+    text-style: bold;
+}
+
+.directory {
+    color: $warning;
+    text-style: bold;
+}
+
+.file-size {
+    color: $accent;
+    text-align: right;
+}
+
+.breadcrumb {
+    background: $surface;
+    color: $primary;
+    padding: 1;
+    text-style: bold;
+}
+
+.error-message {
+    color: $error;
+    text-style: bold;
+    background: $background;
+    padding: 1;
+    text-align: center;
+}
+
+.success-message {
+    color: $success;
+    text-style: bold;
+    background: $background;
+    padding: 1;
+    text-align: center;
+}
+
+.warning-message {
+    color: $warning;
+    text-style: bold;
+    background: $background;
+    padding: 1;
+    text-align: center;
+}
+
+ProgressBar {
+    margin: 1;
+}
+
+Label {
+    margin: 1;
+}
+
+RadioSet {
+    margin: 1;
+}
+
+Checkbox {
+    margin: 1;
+}
+
+DirectoryTree {
+    margin: 1;
+    padding: 1;
+}
+
+Log {
+    margin: 1;
+    padding: 1;
+    border: solid $accent;
+} 

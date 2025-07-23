@@ -7,6 +7,8 @@ requires-python = ">=3.13"
 dependencies = [
     "guessit>=3.8.0",
     "tqdm>=4.67.1",
+    "textual>=0.54.0",
+    "textual-dev>=0.54.0",
 ]
 
 [project.optional-dependencies]
