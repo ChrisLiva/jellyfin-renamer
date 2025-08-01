@@ -78,6 +78,7 @@ if errorlevel 1 (
 
 REM Install project dependencies
 echo [INFO] Installing project dependencies...
+uv venv
 uv sync
 if errorlevel 1 (
     echo [ERROR] Failed to install dependencies.

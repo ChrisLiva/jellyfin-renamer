@@ -237,6 +237,7 @@ main() {
     
     # Install project dependencies
     print_status "Installing project dependencies..."
+    uv venv
     uv sync
     
     # Create executable
