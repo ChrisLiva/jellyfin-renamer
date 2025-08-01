@@ -11,7 +11,7 @@ https://jellyfin.org/docs/general/server/media/shows
 - **Command-Line Interface**: Direct CLI access for automation and scripting
 - **Smart Media Parsing**: Uses `guessit` library to extract movie/TV titles, years, resolution, and parts from filenames
 - **Jellyfin-Compatible Structure**: Creates organized folder structures that work well with Jellyfin
-- **Advanced Audio Processing**: Optionally converts audio to FLAC stereo with EBU R128 loudness normalization optimized for outdoor viewing
+- **Audio Processing**: Optionally converts audio to FLAC stereo format using FFmpeg
 - **Extras Support**: Automatically categorizes trailers, behind-the-scenes content, and other extras
 - **Progress Tracking**: Shows detailed progress bars for all operations with real-time updates
 - **Concurrent Processing**: Processes multiple files with FFmpeg concurrently (max 2 at a time)
@@ -21,68 +21,39 @@ https://jellyfin.org/docs/general/server/media/shows
 ## Prerequisites
 
 - Python 3.13 or higher
-- FFmpeg installed and available in your PATH
+- FFmpeg installed and available in your PATH (for audio processing)
 - UV package manager (recommended) or pip
 
-## Project Setup
+## Installation
 
-### 1. Clone the Repository
+For detailed installation instructions, please see the [Installation Guide](INSTALL.md).
 
-```bash
-git clone <repository-url>
-cd jellyfin-renamer
-```
+### Quick Setup
 
-### 2. Install Dependencies
-
-#### Using UV (Recommended)
-
-1. **Install UV** (if not already installed):
+1. **Clone the repository**:
 
    ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   # or
-   brew install uv
-   ```
-
-2. **Create virtual environment and install dependencies**:
-
-   ```bash
-   uv venv
-   uv sync
-   ```
-
-3. **Install development dependencies** (for testing):
-
-   ```bash
-   uv sync --group dev
-   ```
-
-#### Using pip (Alternative)
-
-1. **Create a virtual environment**:
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   git clone https://github.com/ChrisLiva/jellyfin-renamer
+   cd jellyfin-renamer
    ```
 
 2. **Install dependencies**:
 
    ```bash
+   # Using UV (recommended)
+   uv venv
+   uv sync
+
+   # Or using pip
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -e .
-   pip install -e ".[test]"
    ```
 
-### 3. Verify Installation
-
-```bash
-# Check if the main script runs
-python jellyfin-renamer.py --help
-
-# Check if pytest is available
-python -m pytest --version
-```
+3. **Verify installation**:
+   ```bash
+   python jellyfin-renamer.py --help
+   ```
 
 ## Running Tests
 
@@ -142,10 +113,7 @@ python jellyfin-renamer.py <source_directory> <target_directory> [options]
 - `--content-type {movies,tv,auto}`: Type of content to process (default: auto)
 - `--downmix-audio`: Optional flag to process audio with FFmpeg (default: False)
   - Converts audio to stereo FLAC format
-  - Applies EBU R128 loudness normalization with settings optimized for outdoor viewing:
-    - Integrated loudness: -14 LUFS
-    - True peak: -1.5 dBTP
-    - Loudness range: 9 LU
+  - Preserves video and subtitle streams without re-encoding
 
 #### Examples
 
@@ -171,7 +139,6 @@ python jellyfin-renamer.py /path/to/media /path/to/jellyfin/media --downmix-audi
 6. **Copying**: Copies files to their new locations with proper naming
 7. **Processing**: Optionally processes audio using FFmpeg (when `--downmix-audio` is used):
    - Converts to stereo FLAC format
-   - Applies EBU R128 loudness normalization for consistent volume levels
    - Preserves video and subtitle streams without re-encoding
 8. **Extras**: Organizes trailers, behind-the-scenes content, etc. into subfolders
 
@@ -265,13 +232,9 @@ Monitor these metrics during processing:
 
 ## Audio Processing Details
 
-When using the `--downmix-audio` flag, the tool applies advanced audio processing:
+When using the `--downmix-audio` flag, the tool applies audio processing:
 
 - **Format**: Converts audio to FLAC stereo for better compatibility and lossless quality
-- **Loudness Normalization**: Uses EBU R128 standard with FFmpeg's `loudnorm` filter
-  - **Integrated Loudness**: -14 LUFS (louder than broadcast standard for outdoor viewing)
-  - **True Peak**: -1.5 dBTP (prevents clipping)
-  - **Loudness Range**: 9 LU (maintains dynamic range)
 - **Stream Preservation**: Video and subtitle streams are copied without re-encoding
 - **Concurrent Processing**: FFmpeg operations run concurrently (max 2 at a time) to optimize performance
 
@@ -297,5 +260,4 @@ python -v jellyfin-renamer.py source target
 - Progress bars show the status of all operations
 - Duplicate filenames are automatically handled with version numbers
 - The tool preserves original files and creates copies in the target directory
-- Audio processing settings are optimized for outdoor/projector viewing where ambient noise is higher
 - Mixed content processing automatically separates movies and TV shows into different directories

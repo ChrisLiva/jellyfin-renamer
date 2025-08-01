@@ -15,7 +15,7 @@ async def process_with_ffmpeg_async(input_path, output_path, pbar=None):
         "-c:s",
         "copy",  # Copy all subtitle streams
         "-af",
-        "loudnorm=I=-14:TP=-1.5:LRA=9",  # Louder normalization for outdoor viewing
+        # "loudnorm=I=-14:TP=-1.5:LRA=9",  # Louder normalization for outdoor viewing
         "-ac",
         "2",
         "-c:a",
