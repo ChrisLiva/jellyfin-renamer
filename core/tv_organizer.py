@@ -176,25 +176,29 @@ async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
 
     all_main_files, all_extra_files = prepare_tv_operations(series_groups, target_dir)
 
-    # Copy main files
-    print("\nCopying and renaming episode files...")
+    # Copy or move main files
+    action = "Copying" if downmix_audio else "Moving"
+    print(f"\n{action} and renaming episode files...")
 
     ffmpeg_tasks = []
-    with tqdm(all_main_files, desc="Copying episodes") as pbar:
+    with tqdm(all_main_files, desc=f"{action} episodes") as pbar:
         for file_info, target_path in pbar:
-            shutil.copy2(file_info["path"], target_path)
+            if downmix_audio:
+                shutil.copy2(file_info["path"], target_path)
+            else:
+                shutil.move(file_info["path"], target_path)
 
             if downmix_audio:
                 base, ext = os.path.splitext(target_path)
                 temp_path = f"{base}.temp{ext}"
                 ffmpeg_tasks.append((target_path, temp_path))
 
-    # Copy extra files
+    # Move extra files (extras are never FFmpeg-processed)
     if all_extra_files:
-        print("\nCopying extra files...")
-        with tqdm(all_extra_files, desc="Copying extras") as pbar:
+        print("\nMoving extra files...")
+        with tqdm(all_extra_files, desc="Moving extras") as pbar:
             for file_info, target_path in pbar:
-                shutil.copy2(file_info["path"], target_path)
+                shutil.move(file_info["path"], target_path)
 
     # Process with FFmpeg if needed
     if downmix_audio and ffmpeg_tasks:
