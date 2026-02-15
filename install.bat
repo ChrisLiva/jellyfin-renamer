@@ -79,29 +79,47 @@ if not defined QUIET echo [INFO] Python version: %PYTHON_VERSION% - OK
 
 if defined SKIP_DEPS (
     if not defined QUIET echo [INFO] Skipping dependency installation ^(--skip-deps^)
-    goto skip_deps_section
+    goto after_deps
 )
 
 call :check_already_installed
 
-set "UV_CHECKED="
+set "UV_AVAILABLE="
 if not defined QUIET echo [INFO] Checking for UV package manager...
 uv --version >nul 2>&1
 if not errorlevel 1 (
+    set "UV_AVAILABLE=yes"
     for /f "tokens=*" %%i in ('uv --version 2^>^&1') do if not defined QUIET echo [INFO] UV found: %%i
 ) else (
     if not defined QUIET echo [WARNING] UV package manager not found.
     call :prompt "Install UV package manager?" INSTALL_UV
     if !INSTALL_UV!==yes (
-        if not defined QUIET echo [INFO] Installing UV via pip...
-        pip install uv >nul 2>&1
-        if errorlevel 1 (
-            echo [ERROR] Failed to install UV.
-            echo Please install it manually: https://docs.astral.sh/uv/getting-started/installation/
-            pause
-            exit /b 1
+        if defined DRY_RUN (
+            if not defined QUIET echo [INFO] Would install UV via pip...
+            set "UV_AVAILABLE=yes"
+        ) else (
+            if not defined QUIET echo [INFO] Installing UV via pip...
+            pip install uv >nul 2>&1
+            if errorlevel 1 (
+                echo [ERROR] Failed to install UV.
+                echo Please install it manually: https://docs.astral.sh/uv/getting-started/installation/
+                pause
+                exit /b 1
+            )
+            set "UV_AVAILABLE=yes"
+            if not defined QUIET echo [INFO] UV installed successfully!
         )
-        if not defined QUIET echo [INFO] UV installed successfully!
+    )
+)
+
+if not defined UV_AVAILABLE (
+    if not defined DRY_RUN (
+        echo [ERROR] UV is required to install dependencies.
+        echo Please install UV or rerun with --skip-deps.
+        pause
+        exit /b 1
+    ) else (
+        if not defined QUIET echo [WARNING] UV not available; dependency install would be skipped.
     )
 )
 
@@ -148,8 +166,6 @@ if not errorlevel 1 (
     )
 )
 
-:skip_deps_section
-
 if not defined DRY_RUN (
     if not defined QUIET echo [INFO] Installing project dependencies...
     uv venv
@@ -162,6 +178,8 @@ if not defined DRY_RUN (
 ) else (
     if not defined QUIET echo [INFO] Would install dependencies with: uv venv ^&^& uv sync
 )
+
+:after_deps
 
 if not defined QUIET echo [INFO] Creating executable...
 set "INSTALL_DIR=%USERPROFILE%\.local\bin"
@@ -181,7 +199,7 @@ echo.
 echo REM Check if UV is available
 echo uv --version ^>nul 2^>^&1
 echo if not errorlevel 1 ^(
-echo     uv run python jellyfin-renamer.bat %%*
+echo     uv run python jellyfin-renamer.py %%*
 echo ^) else ^(
 echo     python jellyfin-renamer.py %%*
 echo ^)
@@ -315,7 +333,7 @@ set "PROMPT_TEXT=%~1"
 set "PROMPT_RESULT="
 if defined INTERACTIVE (
     if /i "%INTERACTIVE%"=="no" (
-        set "%2=no"
+        set "%2=yes"
         goto :eof
     )
     set /p "PROMPT_RESULT=%PROMPT_TEXT% (y/N): "
@@ -336,14 +354,14 @@ set "PROMPT_TIMEOUT=%~2"
 set "PROMPT_RESULT="
 if defined INTERACTIVE (
     if /i "%INTERACTIVE%"=="no" (
-        set "%3=no"
+        set "%3=yes"
         goto :eof
     )
-    powershell -Command "$host.UI.RawUI.WindowTitle = 'Input'; $result = Read-Host '%PROMPT_TEXT% [y/N]' -Timeout %PROMPT_TIMEOUT%; if ($result -eq 'y') { exit 0 } else { exit 1 }"
-    if !errorlevel!==0 (
-        set "%3=yes"
-    ) else (
+    choice /C YN /T %PROMPT_TIMEOUT% /D N /M "%PROMPT_TEXT% (y/N): "
+    if errorlevel 2 (
         set "%3=no"
+    ) else (
+        set "%3=yes"
     )
 ) else (
     set "%3=no"

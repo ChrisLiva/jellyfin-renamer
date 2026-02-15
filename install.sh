@@ -51,14 +51,14 @@ detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if command_exists pacman; then
             echo "arch"
-        elif command_exists snap; then
-            echo "snap"
         elif command_exists apt-get; then
             echo "debian"
-        elif command_exists yum; then
-            echo "rhel"
         elif command_exists dnf; then
             echo "fedora"
+        elif command_exists yum; then
+            echo "rhel"
+        elif command_exists snap; then
+            echo "snap"
         else
             echo "linux"
         fi
@@ -96,7 +96,7 @@ prompt_yes_no() {
     local default="${2:-no}"
     
     if [[ "$INTERACTIVE" == "false" ]]; then
-        [[ "$default" == "yes" ]] && return 0 || return 1
+        return 0
     fi
     
     if [[ "$default" == "yes" ]]; then
@@ -119,7 +119,7 @@ prompt_timeout() {
     local default="${3:-no}"
     
     if [[ "$INTERACTIVE" == "false" ]]; then
-        [[ "$default" == "yes" ]] && return 0 || return 1
+        return 0
     fi
     
     read -t "$timeout" -p "$prompt [y/N]: " -r
@@ -275,10 +275,23 @@ install_python() {
     echo
     
     if prompt_yes_no "Try to install Python 3.13 using uv?" "yes"; then
+        if ! command_exists uv; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                print_status "Would install UV package manager."
+            else
+                print_warning "UV not available. Installing UV first..."
+                install_uv
+            fi
+        fi
+
         if command_exists uv; then
-            [[ "$DRY_RUN" == "false" ]] && uv python install 3.13
-            print_status "Python 3.13 installed! Please restart the installer."
-            exit 0
+            if [[ "$DRY_RUN" == "true" ]]; then
+                print_status "Would install Python 3.13 with: uv python install 3.13"
+            else
+                uv python install 3.13
+                print_status "Python 3.13 installed! Please restart the installer."
+                exit 0
+            fi
         else
             print_warning "UV not available. Please install Python manually."
         fi
@@ -346,6 +359,11 @@ EOF
 }
 
 create_desktop_shortcut() {
+    if ! command_exists gnome-terminal; then
+        print_warning "Skipping desktop shortcut (gnome-terminal not found)."
+        return 0
+    fi
+
     if [[ -d "$HOME/Desktop" ]] || [[ -d "$HOME/desktop" ]]; then
         local desktop_dir="$HOME/Desktop"
         [[ -d "$HOME/desktop" ]] && desktop_dir="$HOME/desktop"
@@ -426,10 +444,19 @@ main() {
         if ! command_exists uv; then
             print_warning "UV package manager not found."
             if prompt_yes_no "Install UV package manager?" "yes"; then
-                install_uv
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    print_status "Would install UV package manager."
+                else
+                    install_uv
+                fi
             fi
         else
             print_status "UV package manager found: $(uv --version)"
+        fi
+
+        if [[ "$DRY_RUN" == "false" ]] && ! command_exists uv; then
+            print_error "UV is required to install dependencies. Install UV or rerun with --skip-deps."
+            exit 1
         fi
         
         if ! command_exists ffmpeg; then
@@ -440,14 +467,18 @@ main() {
         else
             print_status "FFmpeg found: $(ffmpeg -version | head -n1)"
         fi
-    else
-        print_status "Skipping dependency installation (--skip-deps)"
     fi
     
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "$SKIP_DEPS" == "true" ]]; then
+        print_status "Skipping dependency installation (--skip-deps)"
+    elif [[ "$DRY_RUN" == "true" ]]; then
         print_status "Would install project dependencies with: uv venv && uv sync"
     else
         print_step "Installing project dependencies..."
+        if ! command_exists uv; then
+            print_error "UV is required to install dependencies. Install UV or rerun with --skip-deps."
+            exit 1
+        fi
         uv venv
         uv sync
     fi
