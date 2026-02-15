@@ -3,43 +3,65 @@
 # Jellyfin Renamer Install Script
 # This script installs the jellyfin-renamer tool to make it available system-wide
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
+QUIET=false
+SKIP_DEPS=false
+DRY_RUN=false
+INTERACTIVE=true
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Function to print colored output
 print_status() {
+    [[ "$QUIET" == "true" ]] && return
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
 print_warning() {
+    [[ "$QUIET" == "true" ]] && return
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1" >&2
 }
 
 print_header() {
+    [[ "$QUIET" == "true" ]] && return
     echo -e "${BLUE}================================${NC}"
     echo -e "${BLUE}  Jellyfin Renamer Installer${NC}"
     echo -e "${BLUE}================================${NC}"
 }
 
-# Function to check if command exists
+print_step() {
+    [[ "$QUIET" == "true" ]] && return
+    echo -e "${CYAN}[STEP]${NC} $1"
+}
+
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to detect OS
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "linux"
+        if command_exists pacman; then
+            echo "arch"
+        elif command_exists snap; then
+            echo "snap"
+        elif command_exists apt-get; then
+            echo "debian"
+        elif command_exists yum; then
+            echo "rhel"
+        elif command_exists dnf; then
+            echo "fedora"
+        else
+            echo "linux"
+        fi
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "macos"
     else
@@ -47,16 +69,21 @@ detect_os() {
     fi
 }
 
-# Function to get Python version
 get_python_version() {
-    python3 --version 2>/dev/null | cut -d' ' -f2 | cut -d'.' -f1,2
+    python3 --version 2>/dev/null | cut -d' ' -f2
 }
 
-# Function to check Python version
+parse_python_version() {
+    local version="$1"
+    echo "$version" | cut -d'.' -f1,2
+}
+
 check_python_version() {
     local version=$(get_python_version)
-    local major=$(echo $version | cut -d'.' -f1)
-    local minor=$(echo $version | cut -d'.' -f2)
+    [[ -z "$version" ]] && return 1
+    
+    local major=$(echo "$version" | cut -d'.' -f1)
+    local minor=$(echo "$version" | cut -d'.' -f2)
     
     if [[ $major -lt 3 ]] || ([[ $major -eq 3 ]] && [[ $minor -lt 13 ]]); then
         return 1
@@ -64,100 +91,235 @@ check_python_version() {
     return 0
 }
 
-# Function to install UV
+prompt_yes_no() {
+    local prompt="$1"
+    local default="${2:-no}"
+    
+    if [[ "$INTERACTIVE" == "false" ]]; then
+        [[ "$default" == "yes" ]] && return 0 || return 1
+    fi
+    
+    if [[ "$default" == "yes" ]]; then
+        read -p "$prompt [Y/n]: " -r
+    else
+        read -p "$prompt [y/N]: " -r
+    fi
+    echo
+    
+    if [[ -z "$REPLY" ]]; then
+        [[ "$default" == "yes" ]] && return 0 || return 1
+    fi
+    
+    [[ "$REPLY" =~ ^[Yy]$ ]] && return 0 || return 1
+}
+
+prompt_timeout() {
+    local prompt="$1"
+    local timeout="${2:-10}"
+    local default="${3:-no}"
+    
+    if [[ "$INTERACTIVE" == "false" ]]; then
+        [[ "$default" == "yes" ]] && return 0 || return 1
+    fi
+    
+    read -t "$timeout" -p "$prompt [y/N]: " -r
+    echo
+    
+    if [[ -z "$REPLY" ]]; then
+        [[ "$default" == "yes" ]] && return 0 || return 1
+    fi
+    
+    [[ "$REPLY" =~ ^[Yy]$ ]] && return 0 || return 1
+}
+
 install_uv() {
-    print_status "Installing UV package manager..."
+    print_step "Installing UV package manager..."
+    
+    if command_exists pip3 || command_exists pip; then
+        print_status "Installing UV via pip..."
+        pip3 install uv 2>/dev/null || pip install uv 2>/dev/null || {
+            print_error "Failed to install UV via pip."
+            exit 1
+        }
+        print_status "UV installed successfully!"
+        return 0
+    fi
     
     if command_exists curl; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.cargo/bin:$PATH"
-        print_status "UV installed successfully!"
+        print_status "Installing UV via official installer..."
+        
+        if [[ "$QUIET" == "true" ]]; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh -s -- -y >/dev/null 2>&1
+        else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+        fi
+        
+        if [[ -f "$HOME/.local/bin/uv" ]]; then
+            export PATH="$HOME/.local/bin:$PATH"
+            print_status "UV installed successfully!"
+            return 0
+        elif [[ -f "$HOME/.cargo/bin/uv" ]]; then
+            export PATH="$HOME/.cargo/bin:$PATH"
+            print_status "UV installed successfully!"
+            return 0
+        else
+            print_error "UV installation failed. Please install manually:"
+            echo "  pip install uv"
+            echo "  or visit: https://docs.astral.sh/uv/getting-started/installation/"
+            exit 1
+        fi
     else
-        print_error "curl is required to install UV. Please install curl first."
+        print_error "curl or pip is required to install UV."
+        print_status "Please install curl or pip first, then run this script again."
         exit 1
     fi
 }
 
-# Function to install FFmpeg
 install_ffmpeg() {
     local os=$(detect_os)
     
-    print_status "Installing FFmpeg..."
+    print_step "Installing FFmpeg..."
     
     if [[ "$os" == "macos" ]]; then
         if command_exists brew; then
-            brew install ffmpeg
+            if prompt_yes_no "Install FFmpeg via Homebrew?" "yes"; then
+                [[ "$DRY_RUN" == "false" ]] && brew install ffmpeg
+                print_status "FFmpeg installed successfully!"
+            else
+                print_warning "Skipping FFmpeg installation."
+            fi
         else
             print_error "Homebrew is required to install FFmpeg on macOS."
             print_status "Please install Homebrew first: https://brew.sh"
             exit 1
         fi
-    elif [[ "$os" == "linux" ]]; then
-        if command_exists apt-get; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-        elif command_exists yum; then
-            sudo yum install -y ffmpeg
-        elif command_exists dnf; then
-            sudo dnf install -y ffmpeg
+    elif [[ "$os" == "debian" ]] || [[ "$os" == "ubuntu" ]]; then
+        if prompt_yes_no "Install FFmpeg via apt-get? (requires sudo)" "yes"; then
+            [[ "$DRY_RUN" == "false" ]] && sudo apt-get update && sudo apt-get install -y ffmpeg
+            print_status "FFmpeg installed successfully!"
         else
-            print_error "Could not install FFmpeg automatically. Please install it manually."
-            print_status "Visit: https://ffmpeg.org/download.html"
-            exit 1
+            print_warning "Skipping FFmpeg installation."
+        fi
+    elif [[ "$os" == "arch" ]]; then
+        if prompt_yes_no "Install FFmpeg via pacman? (requires sudo)" "yes"; then
+            [[ "$DRY_RUN" == "false" ]] && sudo pacman -Sy --noconfirm ffmpeg
+            print_status "FFmpeg installed successfully!"
+        else
+            print_warning "Skipping FFmpeg installation."
+        fi
+    elif [[ "$os" == "rhel" ]] || [[ "$os" == "fedora" ]]; then
+        if command_exists dnf; then
+            if prompt_yes_no "Install FFmpeg via dnf? (requires sudo)" "yes"; then
+                [[ "$DRY_RUN" == "false" ]] && sudo dnf install -y ffmpeg
+                print_status "FFmpeg installed successfully!"
+            else
+                print_warning "Skipping FFmpeg installation."
+            fi
+        elif command_exists yum; then
+            if prompt_yes_no "Install FFmpeg via yum? (requires sudo)" "yes"; then
+                [[ "$DRY_RUN" == "false" ]] && sudo yum install -y ffmpeg
+                print_status "FFmpeg installed successfully!"
+            else
+                print_warning "Skipping FFmpeg installation."
+            fi
+        fi
+    elif [[ "$os" == "snap" ]]; then
+        if prompt_yes_no "Install FFmpeg via snap? (requires sudo)" "yes"; then
+            [[ "$DRY_RUN" == "false" ]] && sudo snap install ffmpeg
+            print_status "FFmpeg installed successfully!"
+        else
+            print_warning "Skipping FFmpeg installation."
         fi
     else
-        print_error "Could not determine OS for FFmpeg installation."
+        print_warning "Could not install FFmpeg automatically for this OS."
         print_status "Please install FFmpeg manually: https://ffmpeg.org/download.html"
-        exit 1
     fi
-    
-    print_status "FFmpeg installed successfully!"
 }
 
-# Function to create the executable script
+check_already_installed() {
+    local script_path="$HOME/.local/bin/jellyfin-renamer"
+    if [[ -f "$script_path" ]]; then
+        print_warning "jellyfin-renamer appears to already be installed."
+        if prompt_yes_no "Reinstall?" "no"; then
+            rm -f "$script_path"
+            print_status "Removing old installation..."
+        else
+            print_status "Keeping existing installation. Exiting."
+            exit 0
+        fi
+    fi
+}
+
+install_python() {
+    print_error "Python 3.13 or higher is required."
+    print_status "Current version: $(python3 --version 2>/dev/null || echo 'Python not found')"
+    echo
+    print_status "Please install Python 3.13+ using one of these methods:"
+    echo
+    echo -e "  ${CYAN}macOS:${NC}"
+    echo "    brew install python@3.13"
+    echo
+    echo -e "  ${CYAN}Linux (Ubuntu/Debian):${NC}"
+    echo "    sudo apt-get install python3.13"
+    echo "    # Or use pyenv:"
+    echo "    curl https://pyenv.run | bash"
+    echo
+    echo -e "  ${CYAN}Linux (Arch):${NC}"
+    echo "    sudo pacman -S python313"
+    echo
+    echo -e "  ${CYAN}Windows:${NC}"
+    echo "    Download from: https://www.python.org/downloads/"
+    echo
+    echo -e "  ${CYAN}All platforms (using UV):${NC}"
+    echo "    uv python install 3.13"
+    echo
+    
+    if prompt_yes_no "Try to install Python 3.13 using uv?" "yes"; then
+        if command_exists uv; then
+            [[ "$DRY_RUN" == "false" ]] && uv python install 3.13
+            print_status "Python 3.13 installed! Please restart the installer."
+            exit 0
+        else
+            print_warning "UV not available. Please install Python manually."
+        fi
+    fi
+    
+    exit 1
+}
+
 create_executable() {
     local install_dir="$HOME/.local/bin"
     local script_path="$install_dir/jellyfin-renamer"
+    local project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
-    # Create directory if it doesn't exist
     mkdir -p "$install_dir"
     
-    # Create the executable script
-    cat > "$script_path" << 'EOF'
+    cat > "$script_path" << EOF
 #!/bin/bash
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")/jellyfin-renamer"
+SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$project_dir"
 
-# Check if the project directory exists
-if [[ ! -d "$PROJECT_DIR" ]]; then
-    echo "Error: jellyfin-renamer project directory not found at $PROJECT_DIR"
-    echo "Please ensure the project is installed correctly."
+if [[ ! -d "\$PROJECT_DIR" ]]; then
+    echo "Error: jellyfin-renamer project directory not found at \$PROJECT_DIR"
+    echo "Please reinstall the tool."
     exit 1
 fi
 
-# Change to the project directory
-cd "$PROJECT_DIR"
+cd "\$PROJECT_DIR"
 
-# Check if UV is available
 if command -v uv >/dev/null 2>&1; then
-    # Use UV to run the script
-    uv run python jellyfin-renamer.py "$@"
+    uv run python jellyfin-renamer.py "\$@"
 else
-    # Fallback to direct Python execution
-    python3 jellyfin-renamer.py "$@"
+    python3 jellyfin-renamer.py "\$@"
 fi
 EOF
 
-    # Make the script executable
     chmod +x "$script_path"
     
     print_status "Created executable at: $script_path"
     
-    # Add to PATH if not already there
     if [[ ":$PATH:" != *":$install_dir:"* ]]; then
-        # Add to shell profile
         local profile_file=""
         if [[ -f "$HOME/.bashrc" ]]; then
             profile_file="$HOME/.bashrc"
@@ -168,24 +330,29 @@ EOF
         fi
         
         if [[ -n "$profile_file" ]]; then
-            echo "" >> "$profile_file"
-            echo "# Add jellyfin-renamer to PATH" >> "$profile_file"
-            echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$profile_file"
-            print_status "Added PATH export to $profile_file"
-            print_warning "Please restart your terminal or run 'source $profile_file' to use jellyfin-renamer"
+            if ! grep -q "$install_dir" "$profile_file" 2>/dev/null; then
+                echo "" >> "$profile_file"
+                echo "# Jellyfin Renamer" >> "$profile_file"
+                echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$profile_file"
+                print_status "Added PATH export to $profile_file"
+            fi
+            print_warning "Please restart your terminal or run: source $profile_file"
         else
-            print_warning "Could not automatically add to PATH. Please add '$install_dir' to your PATH manually."
+            print_warning "Could not automatically add to PATH. Add '$install_dir' to your PATH manually."
         fi
     fi
     
-    return "$script_path"
+    return 0
 }
 
-# Function to create desktop shortcut (optional)
 create_desktop_shortcut() {
-    if [[ -d "$HOME/Desktop" ]]; then
-        local desktop_file="$HOME/Desktop/jellyfin-renamer.desktop"
-        cat > "$desktop_file" << EOF
+    if [[ -d "$HOME/Desktop" ]] || [[ -d "$HOME/desktop" ]]; then
+        local desktop_dir="$HOME/Desktop"
+        [[ -d "$HOME/desktop" ]] && desktop_dir="$HOME/desktop"
+        
+        local shortcut_path="$desktop_dir/jellyfin-renamer.desktop"
+        
+        cat > "$shortcut_path" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
@@ -195,68 +362,114 @@ Exec=gnome-terminal -- bash -c "jellyfin-renamer --help; exec bash"
 Terminal=true
 Categories=Utility;
 EOF
-        chmod +x "$desktop_file"
-        print_status "Created desktop shortcut"
+        chmod +x "$shortcut_path"
+        print_status "Created desktop shortcut at: $shortcut_path"
     fi
 }
 
-# Main installation function
 main() {
+    for arg in "$@"; do
+        case $arg in
+            -q|--quiet)
+                QUIET=true
+                shift
+                ;;
+            --skip-deps)
+                SKIP_DEPS=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            -y|--yes)
+                INTERACTIVE=false
+                shift
+                ;;
+            -h|--help)
+                echo "Usage: $0 [OPTIONS]"
+                echo
+                echo "Options:"
+                echo "  -q, --quiet      Quiet mode (minimal output)"
+                echo "  --skip-deps      Skip dependency installation"
+                echo "  --dry-run        Show what would be done without doing it"
+                echo "  -y, --yes        Non-interactive mode (answer yes to prompts)"
+                echo "  -h, --help       Show this help message"
+                exit 0
+                ;;
+        esac
+    done
+    
     print_header
     
-    # Check if we're in the right directory
+    if [[ "$DRY_RUN" == "true" ]]; then
+        print_warning "Running in DRY-RUN mode - no changes will be made"
+        echo
+    fi
+    
     if [[ ! -f "jellyfin-renamer.py" ]] || [[ ! -f "pyproject.toml" ]]; then
         print_error "Please run this script from the jellyfin-renamer project directory."
         exit 1
     fi
     
-    # Check Python version
-    print_status "Checking Python version..."
+    if [[ "$SKIP_DEPS" == "false" ]]; then
+        check_already_installed
+    fi
+    
+    print_step "Checking Python version..."
     if ! check_python_version; then
-        print_error "Python 3.13 or higher is required."
-        print_status "Current version: $(python3 --version 2>/dev/null || echo 'Python not found')"
-        exit 1
+        install_python
     fi
     print_status "Python version OK: $(python3 --version)"
     
-    # Check/install UV
-    if ! command_exists uv; then
-        print_warning "UV package manager not found. Installing..."
-        install_uv
+    if [[ "$SKIP_DEPS" == "false" ]]; then
+        if ! command_exists uv; then
+            print_warning "UV package manager not found."
+            if prompt_yes_no "Install UV package manager?" "yes"; then
+                install_uv
+            fi
+        else
+            print_status "UV package manager found: $(uv --version)"
+        fi
+        
+        if ! command_exists ffmpeg; then
+            print_warning "FFmpeg not found."
+            if prompt_yes_no "Install FFmpeg?" "yes"; then
+                install_ffmpeg
+            fi
+        else
+            print_status "FFmpeg found: $(ffmpeg -version | head -n1)"
+        fi
     else
-        print_status "UV package manager found."
+        print_status "Skipping dependency installation (--skip-deps)"
     fi
     
-    # Check/install FFmpeg
-    if ! command_exists ffmpeg; then
-        print_warning "FFmpeg not found. Installing..."
-        install_ffmpeg
+    if [[ "$DRY_RUN" == "true" ]]; then
+        print_status "Would install project dependencies with: uv venv && uv sync"
     else
-        print_status "FFmpeg found: $(ffmpeg -version | head -n1)"
+        print_step "Installing project dependencies..."
+        uv venv
+        uv sync
     fi
     
-    # Install project dependencies
-    print_status "Installing project dependencies..."
-    uv venv
-    uv sync
+    print_step "Creating executable..."
+    create_executable
     
-    # Create executable
-    print_status "Creating executable..."
-    local script_path=$(create_executable)
-    
-    # Create desktop shortcut (optional)
-    read -p "Create desktop shortcut? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        create_desktop_shortcut
+    if [[ "$DRY_RUN" == "false" ]] && [[ "$INTERACTIVE" == "true" ]]; then
+        if prompt_timeout "Create desktop shortcut?" 10 "no"; then
+            create_desktop_shortcut
+        fi
     fi
     
-    # Test the installation
-    print_status "Testing installation..."
-    if "$script_path" --help >/dev/null 2>&1; then
-        print_status "Installation test successful!"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        print_status "Would test installation with: jellyfin-renamer --help"
     else
-        print_warning "Installation test failed, but the tool may still work."
+        print_step "Testing installation..."
+        if "$HOME/.local/bin/jellyfin-renamer" --help >/dev/null 2>&1; then
+            print_status "Installation test successful!"
+        else
+            print_warning "Installation test failed, but the tool may still work."
+        fi
     fi
     
     echo
@@ -275,5 +488,4 @@ main() {
     echo
 }
 
-# Run main function
-main "$@" 
+main "$@"
