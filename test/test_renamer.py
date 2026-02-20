@@ -356,25 +356,26 @@ def test_build_subtitle_operations(tmp_path):
 
     ops = build_subtitle_operations(all_main_files)
 
-    assert len(ops) == 4, f"Expected 4 ops, got {len(ops)}: {ops}"
+    assert len(ops) == 3, f"Expected 3 ops, got {len(ops)}: {ops}"
 
     by_source = {op["source"]: op for op in ops}
 
     en_op = by_source[str(source_dir / "Movie.2020.1080p.en.srt")]
     assert en_op["lang"] == "en"
     assert en_op["target"].endswith("Movie (2020) - 1080p.en.srt")
+    assert en_op["embed"] is False
 
     plain_op = by_source[str(source_dir / "Movie.2020.1080p.srt")]
     assert plain_op["lang"] is None
     assert plain_op["target"].endswith("Movie (2020) - 1080p.srt")
+    assert plain_op["embed"] is False
 
-    idx_op = by_source[str(source_dir / "Movie.2020.1080p.en.idx")]
-    assert idx_op["lang"] == "en"
-    assert idx_op["target"].endswith("Movie (2020) - 1080p.en.idx")
-
-    sub_op = by_source[str(source_dir / "Movie.2020.1080p.en.sub")]
-    assert sub_op["lang"] == "en"
-    assert sub_op["target"].endswith("Movie (2020) - 1080p.en.sub")
+    # .idx/.sub pair targeting .mkv → embed op
+    embed_op = by_source[str(source_dir / "Movie.2020.1080p.en.idx")]
+    assert embed_op["embed"] is True
+    assert embed_op["lang"] == "en"
+    assert embed_op["target"].endswith(".mkv")
+    assert embed_op["sub_source"].endswith(".en.sub")
 
 
 @pytest.mark.asyncio
