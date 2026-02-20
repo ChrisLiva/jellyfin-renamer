@@ -15,6 +15,7 @@ from core.parser import (
     get_real_extension,
     parse_media_info,
 )
+from core.subtitle_processor import build_subtitle_operations, parse_subtitle_lang
 
 
 @pytest.mark.parametrize(
@@ -309,6 +310,100 @@ def test_edge_cases(filename):
         )
     except Exception as e:
         pytest.fail(f"TV parsing failed for {filename}: {e}")
+
+
+@pytest.mark.parametrize(
+    "filename,expected_stem,expected_lang",
+    [
+        ("Movie.2020.1080p.en.srt", "Movie.2020.1080p", "en"),
+        ("Movie.2020.1080p.srt", "Movie.2020.1080p", None),
+        ("Movie.2020.1080p.eng.srt", "Movie.2020.1080p", "eng"),
+        ("Show.S01E01.720p.fr.ass", "Show.S01E01.720p", "fr"),
+        ("Show.S01E01.720p.ass", "Show.S01E01.720p", None),
+        ("Movie.2020.1080p.de.vtt", "Movie.2020.1080p", "de"),
+        ("Movie.2020.1080p.idx", "Movie.2020.1080p", None),
+        ("Movie.2020.1080p.zh.idx", "Movie.2020.1080p", "zh"),
+    ],
+)
+def test_parse_subtitle_lang(filename, expected_stem, expected_lang):
+    """Test subtitle filename parsing for stem and language code extraction."""
+    stem, lang = parse_subtitle_lang(filename)
+    assert stem == expected_stem, f"Stem mismatch: got '{stem}', expected '{expected_stem}'"
+    assert lang == expected_lang, f"Lang mismatch: got '{lang}', expected '{expected_lang}'"
+
+
+def test_build_subtitle_operations(tmp_path):
+    """Test that subtitle operations are correctly matched to their video files."""
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+
+    video_file = source_dir / "Movie.2020.1080p.mkv"
+    video_file.touch()
+    (source_dir / "Movie.2020.1080p.en.srt").touch()
+    (source_dir / "Movie.2020.1080p.srt").touch()
+    (source_dir / "Movie.2020.1080p.en.idx").touch()
+    (source_dir / "Movie.2020.1080p.en.sub").touch()
+    (source_dir / "unrelated.srt").touch()
+
+    file_info = {
+        "path": str(video_file),
+        "file": "Movie.2020.1080p.mkv",
+    }
+    target_path = str(target_dir / "Movie (2020)" / "Movie (2020) - 1080p.mkv")
+    all_main_files = [(file_info, target_path)]
+
+    ops = build_subtitle_operations(all_main_files)
+
+    assert len(ops) == 4, f"Expected 4 ops, got {len(ops)}: {ops}"
+
+    by_source = {op["source"]: op for op in ops}
+
+    en_op = by_source[str(source_dir / "Movie.2020.1080p.en.srt")]
+    assert en_op["lang"] == "en"
+    assert en_op["target"].endswith("Movie (2020) - 1080p.en.srt")
+
+    plain_op = by_source[str(source_dir / "Movie.2020.1080p.srt")]
+    assert plain_op["lang"] is None
+    assert plain_op["target"].endswith("Movie (2020) - 1080p.srt")
+
+    idx_op = by_source[str(source_dir / "Movie.2020.1080p.en.idx")]
+    assert idx_op["lang"] == "en"
+    assert idx_op["target"].endswith("Movie (2020) - 1080p.en.idx")
+
+    sub_op = by_source[str(source_dir / "Movie.2020.1080p.en.sub")]
+    assert sub_op["lang"] == "en"
+    assert sub_op["target"].endswith("Movie (2020) - 1080p.en.sub")
+
+
+@pytest.mark.asyncio
+async def test_subtitle_organization(temp_dirs):
+    """Test that subtitle files are moved alongside their reorganized video files."""
+    source_dir, target_dir = temp_dirs
+
+    video_file = source_dir / "Movie.2020.1080p.mkv"
+    video_file.write_bytes(b"fake video content")
+    subtitle_file = source_dir / "Movie.2020.1080p.en.srt"
+    subtitle_file.write_text("1\n00:00:01,000 --> 00:00:04,000\nHello world\n")
+
+    await organize(str(source_dir), str(target_dir), "movies", False)
+
+    subtitle_files = list(target_dir.glob("**/*.srt"))
+    assert len(subtitle_files) == 1, (
+        f"Expected 1 subtitle in target, got {len(subtitle_files)}: {subtitle_files}"
+    )
+
+    subtitle_name = subtitle_files[0].name
+    assert ".en.srt" in subtitle_name, (
+        f"Expected language code in subtitle filename, got: {subtitle_name}"
+    )
+
+    video_files = list(target_dir.glob("**/*.mkv"))
+    assert len(video_files) == 1
+    assert subtitle_files[0].parent == video_files[0].parent, (
+        "Subtitle should be in the same folder as the video"
+    )
 
 
 class TestExtensionHandling:

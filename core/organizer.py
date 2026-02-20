@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from .file_processor import process_with_ffmpeg_async
 from .parser import get_real_extension, parse_media_info
+from .subtitle_processor import build_subtitle_operations, process_subtitle_operations
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".iso"}
 
@@ -251,6 +252,8 @@ async def organize(source_dir, target_dir, content_type, downmix_audio=False):
                 os.makedirs(season_folder, exist_ok=True)
         all_main_files, all_extra_files = prepare_tv_operations(groups, target_dir)
 
+    subtitle_ops = build_subtitle_operations(all_main_files)
+
     action = "Copying" if downmix_audio else "Moving"
     print(f"\n{action} main files...")
 
@@ -276,5 +279,9 @@ async def organize(source_dir, target_dir, content_type, downmix_audio=False):
     if downmix_audio and ffmpeg_tasks:
         print(f"\nProcessing {len(ffmpeg_tasks)} file(s) with FFmpeg...")
         await run_ffmpeg_processing(ffmpeg_tasks, None)
+
+    if subtitle_ops:
+        print(f"\nProcessing {len(subtitle_ops)} subtitle file(s)...")
+        await process_subtitle_operations(subtitle_ops, downmix_audio)
 
     print("\nDone!")
