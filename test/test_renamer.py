@@ -2,15 +2,18 @@
 """
 Unit tests for jellyfin-renamer using pytest framework.
 """
+import pathlib
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from core.movie_organizer import organize_movies
+from core.dry_run import render_dry_run_movies, render_dry_run_tv
+from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
 from core.movie_parser import parse_movie_info
-from core.tv_organizer import organize_tv_shows
+from core.tv_organizer import group_files_by_series, handle_duplicate_files, organize_tv_shows, prepare_tv_operations
 from core.tv_parser import detect_content_type, parse_tv_info
 
 
@@ -302,6 +305,46 @@ async def test_tv_organization(temp_dirs):
         pytest.skip("No test videos found. Run create_test_videos.py first.")
 
 
+def test_prepare_file_operations_is_pure(tmp_path):
+    """prepare_file_operations() should work without touching the filesystem."""
+    # Use a target dir that does NOT exist — proves no os.makedirs/os.path.exists
+    nonexistent_target = str(tmp_path / "nonexistent" / "deep" / "path")
+
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "Inception.2010.720p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    main_files, extra_files = prepare_file_operations(movie_groups, nonexistent_target)
+
+    assert len(main_files) == 2
+    assert len(extra_files) == 0
+    # Target paths should be under the nonexistent target dir
+    for file_info, target_path in main_files:
+        assert target_path.startswith(nonexistent_target)
+    # The nonexistent dir should still not exist
+    assert not (tmp_path / "nonexistent").exists()
+
+
+def test_prepare_tv_operations_is_pure(tmp_path):
+    """prepare_tv_operations() should work without touching the filesystem."""
+    nonexistent_target = str(tmp_path / "nonexistent" / "deep" / "path")
+
+    all_files = [
+        (str(tmp_path), "Breaking.Bad.S01E01.720p.BluRay.x264.mkv"),
+        (str(tmp_path), "Breaking.Bad.S01E02.720p.BluRay.x264.mkv"),
+    ]
+    series_groups = group_files_by_series(all_files)
+    main_files, extra_files = prepare_tv_operations(series_groups, nonexistent_target)
+
+    assert len(main_files) == 2
+    assert len(extra_files) == 0
+    for file_info, target_path in main_files:
+        assert target_path.startswith(nonexistent_target)
+        assert "Season 01" in target_path
+    assert not (tmp_path / "nonexistent").exists()
+
+
 @pytest.mark.parametrize(
     "filename",
     [
@@ -371,3 +414,248 @@ class TestExtensionHandling:
 
         assert base == "Show.S01E01.episode.name.with.dots.mov"
         assert ext == ".mkv"
+
+
+def test_movie_prepare_duplicate_detection(tmp_path):
+    """Duplicate movie files should get version suffixes via in-memory tracking."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "Inception.2010.1080p.WEB.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    main_files, _ = prepare_file_operations(movie_groups, str(tmp_path / "target"))
+
+    paths = [t for _, t in main_files]
+    assert len(paths) == len(set(paths)), "All target paths should be unique"
+
+
+def test_tv_handle_duplicate_files_in_memory():
+    """handle_duplicate_files() should use in-memory set for dedup."""
+    seen = set()
+    path1 = handle_duplicate_files("/target/Show S01E01.mkv", seen)
+    path2 = handle_duplicate_files("/target/Show S01E01.mkv", seen)
+
+    assert path1 == "/target/Show S01E01.mkv"
+    assert path2 == "/target/Show S01E01_1.mkv"
+    assert path1 in seen
+    assert path2 in seen
+
+
+def test_dry_run_movie_output(tmp_path, capsys):
+    """Dry-run should print grouped tree for movies."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "Inception (2010)/" in output
+    assert "[MOVE]" in output
+    assert "Inception.2010.1080p.BluRay.mkv" in output or "Inception (2010)" in output
+    assert "would be moved" in output
+
+
+def test_dry_run_tv_output(tmp_path, capsys):
+    """Dry-run should print grouped tree for TV shows."""
+    all_files = [
+        (str(tmp_path), "Breaking.Bad.S01E01.720p.BluRay.x264.mkv"),
+        (str(tmp_path), "Breaking.Bad.S01E02.720p.BluRay.x264.mkv"),
+    ]
+    series_groups = group_files_by_series(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_tv_operations(series_groups, target)
+
+    render_dry_run_tv(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "Breaking Bad/" in output
+    assert "Season 01/" in output
+    assert "[MOVE]" in output
+    assert "would be moved" in output
+
+
+def test_dry_run_ffmpeg_labels(tmp_path, capsys):
+    """Dry-run with downmix_audio should show [COPY + FFMPEG] for main files."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=True)
+
+    output = capsys.readouterr().out
+    assert "[COPY + FFMPEG]" in output
+    assert "would be copied + processed with FFmpeg" in output
+
+
+def test_dry_run_extras_always_move(tmp_path, capsys):
+    """Extras should show [MOVE] even when downmix_audio is True."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "The Matrix (1999) 1080p - Trailer.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=True)
+
+    output = capsys.readouterr().out
+    # Main files get COPY + FFMPEG
+    assert "[COPY + FFMPEG]" in output
+    # Verify extras were detected
+    assert len(extra_files) > 0, "Trailer should be classified as an extra"
+    # Find trailer output lines and verify they show [MOVE]
+    trailer_lines = [
+        line for line in output.splitlines()
+        if "<-" in line and ("trailers/" in line.lower() or "Trailer" in line)
+    ]
+    assert trailer_lines, "Expected at least one trailer output line"
+    for line in trailer_lines:
+        assert "[MOVE]" in line, f"Extras should always be [MOVE], got: {line}"
+
+
+def test_dry_run_extras_subfolder_tree(tmp_path, capsys):
+    """Extras should appear under their subfolder in the tree."""
+    all_files = [
+        (str(tmp_path), "The Matrix (1999) 1080p - Trailer.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "trailers/" in output.lower()
+
+
+@pytest.mark.asyncio
+async def test_movie_dry_run_no_side_effects(tmp_path):
+    """Dry-run should not create any files or directories."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    # Create a dummy video file
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+
+    result = await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+    assert result == (1, 0)
+
+    # Target should be empty
+    assert list(target_dir.iterdir()) == []
+    # Source file should still exist (not moved)
+    assert (source_dir / "Inception.2010.1080p.BluRay.mkv").exists()
+
+
+@pytest.mark.asyncio
+async def test_tv_dry_run_no_side_effects(tmp_path):
+    """Dry-run should not create any files or directories."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    result = await organize_tv_shows(str(source_dir), str(target_dir), dry_run=True)
+    assert result == (1, 0)
+
+    assert list(target_dir.iterdir()) == []
+    assert (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").exists()
+
+
+def test_dry_run_auto_mode_cli(tmp_path):
+    """Auto mode dry-run via CLI should show headings and combined summary."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        ["uv", "run", "python", "jellyfin-renamer.py", str(source_dir), str(target_dir), "--dry-run"],
+        capture_output=True, text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "=== Movies ===" in result.stdout
+    assert "=== TV Shows ===" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_dry_run_no_files_found(tmp_path, capsys):
+    """Dry-run on empty source should print 'No video files found'."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+
+    output = capsys.readouterr().out
+    assert "No video files found" in output
+
+
+def test_dry_run_movies_cli(tmp_path):
+    """--content-type movies --dry-run should show tree and exactly one summary line."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        [
+            "uv", "run", "python", "jellyfin-renamer.py",
+            str(source_dir), str(target_dir),
+            "--content-type", "movies", "--dry-run",
+        ],
+        capture_output=True, text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "Inception (2010)/" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []
+
+
+def test_dry_run_tv_cli(tmp_path):
+    """--content-type tv --dry-run should show tree and exactly one summary line."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        [
+            "uv", "run", "python", "jellyfin-renamer.py",
+            str(source_dir), str(target_dir),
+            "--content-type", "tv", "--dry-run",
+        ],
+        capture_output=True, text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "Breaking Bad/" in result.stdout
+    assert "Season 01/" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []
