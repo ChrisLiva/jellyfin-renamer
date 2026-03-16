@@ -61,19 +61,16 @@ def group_files_by_series(all_files):
 
 
 def prepare_tv_operations(series_groups, target_dir):
-    """Prepare TV show file operations."""
+    """Prepare TV show file operations. Pure function — no filesystem access."""
     all_main_files = []
     all_extra_files = []
+    seen_targets = set()
 
     for series_key, seasons in series_groups.items():
-        # Create series folder
         series_folder = os.path.join(target_dir, series_key)
-        os.makedirs(series_folder, exist_ok=True)
 
         for season_num, files in seasons.items():
-            # Create season folder with zero-padding
             season_folder = os.path.join(series_folder, f"Season {season_num:02d}")
-            os.makedirs(season_folder, exist_ok=True)
 
             # Separate main files and extras
             main_files = [f for f in files if not f["extra_type"]]
@@ -85,19 +82,14 @@ def prepare_tv_operations(series_groups, target_dir):
                     file_info, series_key, season_num
                 )
                 target_path = os.path.join(season_folder, target_filename)
-
-                # Handle duplicates
-                target_path = handle_duplicate_files(target_path)
+                target_path = handle_duplicate_files(target_path, seen_targets)
                 all_main_files.append((file_info, target_path))
 
             # Process extra files
             for file_info in extra_files:
                 extra_folder = os.path.join(season_folder, file_info["extra_type"])
-                os.makedirs(extra_folder, exist_ok=True)
                 target_path = os.path.join(extra_folder, file_info["file"])
-
-                # Handle duplicates
-                target_path = handle_duplicate_files(target_path)
+                target_path = handle_duplicate_files(target_path, seen_targets)
                 all_extra_files.append((file_info, target_path))
 
     return all_main_files, all_extra_files
@@ -137,17 +129,20 @@ def generate_episode_filename(file_info, series_key, season_num):
     return f"{series_name} {season_str}{episode_str}{part_str}{resolution_str}{ext}"
 
 
-def handle_duplicate_files(target_path):
-    """Handle duplicate file names by adding counter."""
-    if not os.path.exists(target_path):
+def handle_duplicate_files(target_path, seen_targets):
+    """Handle duplicate file names using in-memory tracking."""
+    if target_path not in seen_targets:
+        seen_targets.add(target_path)
         return target_path
 
     base, ext = os.path.splitext(target_path)
     counter = 1
-    while os.path.exists(f"{base}_{counter}{ext}"):
+    while f"{base}_{counter}{ext}" in seen_targets:
         counter += 1
 
-    return f"{base}_{counter}{ext}"
+    result = f"{base}_{counter}{ext}"
+    seen_targets.add(result)
+    return result
 
 
 async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
@@ -175,6 +170,10 @@ async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
                 os.makedirs(season_folder, exist_ok=True)
 
     all_main_files, all_extra_files = prepare_tv_operations(series_groups, target_dir)
+
+    # Create extra folders (series/season folders already created in the tqdm loop above)
+    for file_info, target_path in all_extra_files:
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     # Copy or move main files
     action = "Copying" if downmix_audio else "Moving"

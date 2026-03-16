@@ -10,7 +10,7 @@ import pytest
 
 from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
 from core.movie_parser import parse_movie_info
-from core.tv_organizer import organize_tv_shows
+from core.tv_organizer import group_files_by_series, organize_tv_shows, prepare_tv_operations
 from core.tv_parser import detect_content_type, parse_tv_info
 
 
@@ -320,6 +320,25 @@ def test_prepare_file_operations_is_pure(tmp_path):
     for file_info, target_path in main_files:
         assert target_path.startswith(nonexistent_target)
     # The nonexistent dir should still not exist
+    assert not (tmp_path / "nonexistent").exists()
+
+
+def test_prepare_tv_operations_is_pure(tmp_path):
+    """prepare_tv_operations() should work without touching the filesystem."""
+    nonexistent_target = str(tmp_path / "nonexistent" / "deep" / "path")
+
+    all_files = [
+        (str(tmp_path), "Breaking.Bad.S01E01.720p.BluRay.x264.mkv"),
+        (str(tmp_path), "Breaking.Bad.S01E02.720p.BluRay.x264.mkv"),
+    ]
+    series_groups = group_files_by_series(all_files)
+    main_files, extra_files = prepare_tv_operations(series_groups, nonexistent_target)
+
+    assert len(main_files) == 2
+    assert len(extra_files) == 0
+    for file_info, target_path in main_files:
+        assert target_path.startswith(nonexistent_target)
+        assert "Season 01" in target_path
     assert not (tmp_path / "nonexistent").exists()
 
 
