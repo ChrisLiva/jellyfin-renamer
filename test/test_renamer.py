@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from core.dry_run import render_dry_run_movies, render_dry_run_tv
 from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
 from core.movie_parser import parse_movie_info
 from core.tv_organizer import group_files_by_series, handle_duplicate_files, organize_tv_shows, prepare_tv_operations
@@ -436,3 +437,92 @@ def test_tv_handle_duplicate_files_in_memory():
     assert path2 == "/target/Show S01E01_1.mkv"
     assert path1 in seen
     assert path2 in seen
+
+
+def test_dry_run_movie_output(tmp_path, capsys):
+    """Dry-run should print grouped tree for movies."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "Inception (2010)/" in output
+    assert "[MOVE]" in output
+    assert "Inception.2010.1080p.BluRay.mkv" in output or "Inception (2010)" in output
+    assert "would be moved" in output
+
+
+def test_dry_run_tv_output(tmp_path, capsys):
+    """Dry-run should print grouped tree for TV shows."""
+    all_files = [
+        (str(tmp_path), "Breaking.Bad.S01E01.720p.BluRay.x264.mkv"),
+        (str(tmp_path), "Breaking.Bad.S01E02.720p.BluRay.x264.mkv"),
+    ]
+    series_groups = group_files_by_series(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_tv_operations(series_groups, target)
+
+    render_dry_run_tv(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "Breaking Bad/" in output
+    assert "Season 01/" in output
+    assert "[MOVE]" in output
+    assert "would be moved" in output
+
+
+def test_dry_run_ffmpeg_labels(tmp_path, capsys):
+    """Dry-run with downmix_audio should show [COPY + FFMPEG] for main files."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=True)
+
+    output = capsys.readouterr().out
+    assert "[COPY + FFMPEG]" in output
+    assert "would be copied + processed with FFmpeg" in output
+
+
+def test_dry_run_extras_always_move(tmp_path, capsys):
+    """Extras should show [MOVE] even when downmix_audio is True."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "The Matrix (1999) 1080p - Trailer.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=True)
+
+    output = capsys.readouterr().out
+    # Main files get COPY + FFMPEG
+    assert "[COPY + FFMPEG]" in output
+    # Find the trailers line — it should say [MOVE], not [COPY + FFMPEG]
+    for line in output.splitlines():
+        if ("trailers/" in line.lower() and "<-" in line) or ("Trailer" in line and "<-" in line):
+            assert "[MOVE]" in line, f"Extras should always be [MOVE], got: {line}"
+
+
+def test_dry_run_extras_subfolder_tree(tmp_path, capsys):
+    """Extras should appear under their subfolder in the tree."""
+    all_files = [
+        (str(tmp_path), "The Matrix (1999) 1080p - Trailer.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    target = str(tmp_path / "target")
+    main_files, extra_files = prepare_file_operations(movie_groups, target)
+
+    render_dry_run_movies(main_files, extra_files, target, downmix_audio=False)
+
+    output = capsys.readouterr().out
+    assert "trailers/" in output.lower()
