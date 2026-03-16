@@ -507,10 +507,16 @@ def test_dry_run_extras_always_move(tmp_path, capsys):
     output = capsys.readouterr().out
     # Main files get COPY + FFMPEG
     assert "[COPY + FFMPEG]" in output
-    # Find the trailers line — it should say [MOVE], not [COPY + FFMPEG]
-    for line in output.splitlines():
-        if ("trailers/" in line.lower() and "<-" in line) or ("Trailer" in line and "<-" in line):
-            assert "[MOVE]" in line, f"Extras should always be [MOVE], got: {line}"
+    # Verify extras were detected
+    assert len(extra_files) > 0, "Trailer should be classified as an extra"
+    # Find trailer output lines and verify they show [MOVE]
+    trailer_lines = [
+        line for line in output.splitlines()
+        if "<-" in line and ("trailers/" in line.lower() or "Trailer" in line)
+    ]
+    assert trailer_lines, "Expected at least one trailer output line"
+    for line in trailer_lines:
+        assert "[MOVE]" in line, f"Extras should always be [MOVE], got: {line}"
 
 
 def test_dry_run_extras_subfolder_tree(tmp_path, capsys):
