@@ -3,6 +3,7 @@
 Unit tests for jellyfin-renamer using pytest framework.
 """
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -569,3 +570,40 @@ async def test_tv_dry_run_no_side_effects(tmp_path):
 
     assert list(target_dir.iterdir()) == []
     assert (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").exists()
+
+
+def test_dry_run_auto_mode_cli(tmp_path):
+    """Auto mode dry-run via CLI should show headings and combined summary."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        ["uv", "run", "python", "jellyfin-renamer.py", str(source_dir), str(target_dir), "--dry-run"],
+        capture_output=True, text=True,
+        cwd="/Users/chris/GitHub/jellyfin-renamer/.worktrees/dry-run",
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "=== Movies ===" in result.stdout
+    assert "=== TV Shows ===" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_dry_run_no_files_found(tmp_path, capsys):
+    """Dry-run on empty source should print 'No video files found'."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+
+    output = capsys.readouterr().out
+    assert "No video files found" in output
