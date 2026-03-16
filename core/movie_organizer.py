@@ -46,16 +46,16 @@ def group_files_by_movie(all_files):
 
 
 def prepare_file_operations(movie_groups, target_dir):
-    """Prepare all file copy operations and return lists of main and extra files to process."""
+    """Prepare all file copy operations. Pure function — no filesystem access."""
     all_main_files = []
     all_extra_files = []
+    seen_targets = set()
 
     for key, files in movie_groups.items():
         title, year = re.match(r"^(.*?)(\d{4})?$", key).groups()
         year_str = f" ({year})" if year else ""
         folder_name = f"{title}{year_str}"
         movie_folder = os.path.join(target_dir, folder_name)
-        os.makedirs(movie_folder, exist_ok=True)
 
         # Separate main files and extras
         main_files = [f for f in files if not f["extra_type"]]
@@ -77,30 +77,31 @@ def prepare_file_operations(movie_groups, target_dir):
             target_file = f"{base_name}{os.path.splitext(file_info['file'])[1]}"
             target_path = os.path.join(movie_folder, target_file)
 
-            # Avoid overwrite by adding unique suffix if needed
-            if os.path.exists(target_path):
+            # Avoid collisions using in-memory tracking
+            if target_path in seen_targets:
                 base, ext = os.path.splitext(target_path)
                 counter = 1
-                while os.path.exists(f"{base}_{counter}{ext}"):
+                while f"{base}_{counter}{ext}" in seen_targets:
                     counter += 1
                 target_path = f"{base}_{counter}{ext}"
 
+            seen_targets.add(target_path)
             all_main_files.append((file_info, target_path))
 
         # Prepare extra files
         for file_info in extra_files:
             extra_folder = os.path.join(movie_folder, file_info["extra_type"])
-            os.makedirs(extra_folder, exist_ok=True)
             target_path = os.path.join(extra_folder, file_info["file"])
 
-            # Avoid overwrite
-            if os.path.exists(target_path):
+            # Avoid collisions using in-memory tracking
+            if target_path in seen_targets:
                 base, ext = os.path.splitext(target_path)
                 counter = 1
-                while os.path.exists(f"{base}_{counter}{ext}"):
+                while f"{base}_{counter}{ext}" in seen_targets:
                     counter += 1
                 target_path = f"{base}_{counter}{ext}"
 
+            seen_targets.add(target_path)
             all_extra_files.append((file_info, target_path))
 
     return all_main_files, all_extra_files
@@ -130,6 +131,10 @@ async def organize_movies(source_dir, target_dir, downmix_audio=False):
             os.makedirs(movie_folder, exist_ok=True)
 
     all_main_files, all_extra_files = prepare_file_operations(movie_groups, target_dir)
+
+    # Create extra folders (movie folders already created in the tqdm loop above)
+    for file_info, target_path in all_extra_files:
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     # Copy or move main files
     action = "Copying" if downmix_audio else "Moving"

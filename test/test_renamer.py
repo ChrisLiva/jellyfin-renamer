@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from core.movie_organizer import organize_movies
+from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
 from core.movie_parser import parse_movie_info
 from core.tv_organizer import organize_tv_shows
 from core.tv_parser import detect_content_type, parse_tv_info
@@ -300,6 +300,27 @@ async def test_tv_organization(temp_dirs):
         assert len(season_folders) > 0, "Should have at least one season folder"
     else:
         pytest.skip("No test videos found. Run create_test_videos.py first.")
+
+
+def test_prepare_file_operations_is_pure(tmp_path):
+    """prepare_file_operations() should work without touching the filesystem."""
+    # Use a target dir that does NOT exist — proves no os.makedirs/os.path.exists
+    nonexistent_target = str(tmp_path / "nonexistent" / "deep" / "path")
+
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "Inception.2010.720p.BluRay.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    main_files, extra_files = prepare_file_operations(movie_groups, nonexistent_target)
+
+    assert len(main_files) == 2
+    assert len(extra_files) == 0
+    # Target paths should be under the nonexistent target dir
+    for file_info, target_path in main_files:
+        assert target_path.startswith(nonexistent_target)
+    # The nonexistent dir should still not exist
+    assert not (tmp_path / "nonexistent").exists()
 
 
 @pytest.mark.parametrize(
