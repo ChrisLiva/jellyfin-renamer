@@ -10,7 +10,7 @@ import pytest
 
 from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
 from core.movie_parser import parse_movie_info
-from core.tv_organizer import group_files_by_series, organize_tv_shows, prepare_tv_operations
+from core.tv_organizer import group_files_by_series, handle_duplicate_files, organize_tv_shows, prepare_tv_operations
 from core.tv_parser import detect_content_type, parse_tv_info
 
 
@@ -411,3 +411,28 @@ class TestExtensionHandling:
 
         assert base == "Show.S01E01.episode.name.with.dots.mov"
         assert ext == ".mkv"
+
+
+def test_movie_prepare_duplicate_detection(tmp_path):
+    """Duplicate movie files should get version suffixes via in-memory tracking."""
+    all_files = [
+        (str(tmp_path), "Inception.2010.1080p.BluRay.mkv"),
+        (str(tmp_path), "Inception.2010.1080p.WEB.mkv"),
+    ]
+    movie_groups = group_files_by_movie(all_files)
+    main_files, _ = prepare_file_operations(movie_groups, str(tmp_path / "target"))
+
+    paths = [t for _, t in main_files]
+    assert len(paths) == len(set(paths)), "All target paths should be unique"
+
+
+def test_tv_handle_duplicate_files_in_memory():
+    """handle_duplicate_files() should use in-memory set for dedup."""
+    seen = set()
+    path1 = handle_duplicate_files("/target/Show S01E01.mkv", seen)
+    path2 = handle_duplicate_files("/target/Show S01E01.mkv", seen)
+
+    assert path1 == "/target/Show S01E01.mkv"
+    assert path2 == "/target/Show S01E01_1.mkv"
+    assert path1 in seen
+    assert path2 in seen
