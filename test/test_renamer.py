@@ -2,6 +2,7 @@
 """
 Unit tests for jellyfin-renamer using pytest framework.
 """
+import pathlib
 import shutil
 import subprocess
 import tempfile
@@ -585,7 +586,7 @@ def test_dry_run_auto_mode_cli(tmp_path):
     result = subprocess.run(
         ["uv", "run", "python", "jellyfin-renamer.py", str(source_dir), str(target_dir), "--dry-run"],
         capture_output=True, text=True,
-        cwd="/Users/chris/GitHub/jellyfin-renamer/.worktrees/dry-run",
+        cwd=str(pathlib.Path(__file__).parent.parent),
     )
     assert result.returncode == 0, f"CLI failed: {result.stderr}"
     assert "=== Movies ===" in result.stdout
@@ -607,3 +608,54 @@ async def test_dry_run_no_files_found(tmp_path, capsys):
 
     output = capsys.readouterr().out
     assert "No video files found" in output
+
+
+def test_dry_run_movies_cli(tmp_path):
+    """--content-type movies --dry-run should show tree and exactly one summary line."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        [
+            "uv", "run", "python", "jellyfin-renamer.py",
+            str(source_dir), str(target_dir),
+            "--content-type", "movies", "--dry-run",
+        ],
+        capture_output=True, text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "Inception (2010)/" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []
+
+
+def test_dry_run_tv_cli(tmp_path):
+    """--content-type tv --dry-run should show tree and exactly one summary line."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    result = subprocess.run(
+        [
+            "uv", "run", "python", "jellyfin-renamer.py",
+            str(source_dir), str(target_dir),
+            "--content-type", "tv", "--dry-run",
+        ],
+        capture_output=True, text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0, f"CLI failed: {result.stderr}"
+    assert "Breaking Bad/" in result.stdout
+    assert "Season 01/" in result.stdout
+    assert "would be moved" in result.stdout
+    assert result.stdout.count("would be moved") == 1
+    assert list(target_dir.iterdir()) == []

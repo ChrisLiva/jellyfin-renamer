@@ -17,8 +17,7 @@ async def organize_mixed_content(source_dir, target_dir, downmix_audio=False, dr
     all_files = scan_source_directory(source_dir, content_type="auto")
 
     if not all_files:
-        if dry_run:
-            print(f"No video files found in {source_dir}")
+        print(f"No video files found in {source_dir}")
         return
 
     # Separate files by detected type
