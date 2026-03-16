@@ -145,20 +145,37 @@ def handle_duplicate_files(target_path, seen_targets):
     return result
 
 
-async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
-    """Main TV show organization function."""
+async def organize_tv_shows(source_dir, target_dir, downmix_audio=False, dry_run=False, print_summary=True):
+    """Main TV show organization function.
+
+    When dry_run=True, returns (move_count, ffmpeg_count) tuple.
+    Set print_summary=False when called from organize_mixed_content (which prints its own combined summary).
+    """
+    from .dry_run import render_dry_run_tv
 
     # Scan source directory
     all_files = scan_source_directory(source_dir)
 
-    # Group files with progress bar
-    print("\nAnalyzing TV show files...")
-    with tqdm(all_files, desc="Analyzing files") as pbar:
-        series_groups = group_files_by_series(all_files)
-        for _ in pbar:
-            pass
+    if not all_files:
+        if dry_run:
+            print(f"No video files found in {source_dir}")
+        return (0, 0) if dry_run else None
 
-    # Create directories and prepare operations
+    # Group files
+    series_groups = group_files_by_series(all_files)
+
+    # Prepare operations (pure — no filesystem access)
+    all_main_files, all_extra_files = prepare_tv_operations(series_groups, target_dir)
+
+    if dry_run:
+        return render_dry_run_tv(
+            all_main_files, all_extra_files, target_dir, downmix_audio,
+            print_summary=print_summary,
+        )
+
+    # --- Normal execution below (existing code) ---
+
+    # Create directories
     print("\nCreating series and season directories...")
     with tqdm(series_groups.items(), desc="Creating folders") as pbar:
         for series_key, seasons in pbar:
@@ -169,9 +186,7 @@ async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
                 season_folder = os.path.join(series_folder, f"Season {season_num:02d}")
                 os.makedirs(season_folder, exist_ok=True)
 
-    all_main_files, all_extra_files = prepare_tv_operations(series_groups, target_dir)
-
-    # Create extra folders (series/season folders already created in the tqdm loop above)
+    # Create extra folders
     for file_info, target_path in all_extra_files:
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
@@ -192,7 +207,7 @@ async def organize_tv_shows(source_dir, target_dir, downmix_audio=False):
                 temp_path = f"{base}.temp{ext}"
                 ffmpeg_tasks.append((target_path, temp_path))
 
-    # Move extra files (extras are never FFmpeg-processed)
+    # Move extra files
     if all_extra_files:
         print("\nMoving extra files...")
         with tqdm(all_extra_files, desc="Moving extras") as pbar:

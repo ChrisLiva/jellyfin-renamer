@@ -532,3 +532,38 @@ def test_dry_run_extras_subfolder_tree(tmp_path, capsys):
 
     output = capsys.readouterr().out
     assert "trailers/" in output.lower()
+
+
+@pytest.mark.asyncio
+async def test_movie_dry_run_no_side_effects(tmp_path):
+    """Dry-run should not create any files or directories."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    # Create a dummy video file
+    (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
+
+    await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+
+    # Target should be empty
+    assert list(target_dir.iterdir()) == []
+    # Source file should still exist (not moved)
+    assert (source_dir / "Inception.2010.1080p.BluRay.mkv").exists()
+
+
+@pytest.mark.asyncio
+async def test_tv_dry_run_no_side_effects(tmp_path):
+    """Dry-run should not create any files or directories."""
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
+
+    await organize_tv_shows(str(source_dir), str(target_dir), dry_run=True)
+
+    assert list(target_dir.iterdir()) == []
+    assert (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").exists()
