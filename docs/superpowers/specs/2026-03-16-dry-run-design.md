@@ -17,10 +17,17 @@ uv run python jellyfin-renamer.py <source> <target> --dry-run [--content-type {m
 
 ### Refactor `prepare_*` functions to be pure
 
-Remove all `os.makedirs()` and `os.path.exists()` calls from `prepare_file_operations()` (movie_organizer.py) and `prepare_tv_operations()` (tv_organizer.py).
+Remove all `os.makedirs()` and `os.path.exists()` calls from:
 
-- Directory creation moves into the organizer functions, after prepare but before execute.
+- `prepare_file_operations()` in `movie_organizer.py`
+- `prepare_tv_operations()` in `tv_organizer.py`
+- `handle_duplicate_files()` in `tv_organizer.py` (also uses `os.path.exists()`)
+
+Changes:
+
+- Directory creation moves into the organizer functions, after prepare but before execute. The redundant directory creation pass already in the organizer loops can serve this purpose — remove the duplicated `os.makedirs` from prepare.
 - Duplicate target path detection switches from `os.path.exists()` to an in-memory set of seen paths, applying the counter logic without disk access.
+- All tqdm progress bars are skipped when `dry_run=True` — the branch happens right after grouping, before any tqdm-wrapped loops for directory creation or file operations.
 
 The prepare functions become: data in, operation list out.
 
@@ -57,6 +64,31 @@ Breaking Bad (2008)/
 3 files would be moved, 2 files would be copied + processed with FFmpeg
 ```
 
+**Auto mode (`--content-type auto`) output:**
+
+When auto-detecting, movies and TV shows appear under separate headings:
+```
+=== Movies ===
+
+Inception (2010)/
+  Inception (2010).mkv  <-  /src/inception.mkv  [MOVE]
+
+=== TV Shows ===
+
+Breaking Bad (2008)/
+  Season 01/
+    Breaking Bad S01E01.mkv  <-  /src/bb.s01e01.mkv  [MOVE]
+```
+
+If only one type is detected, only that heading appears. The summary line at the end covers all files across both types.
+
+**Edge case — no files found:**
+
+If the source directory contains no recognized video files, print:
+```
+No video files found in <source_dir>
+```
+
 ### Organizer flow
 
 ```
@@ -70,12 +102,15 @@ Both `organize_movies()` and `organize_tv_shows()` gain a `dry_run=False` parame
 
 ## Testing
 
-Tests in `test/test_renamer.py`:
+Tests in `test/test_renamer.py`, using `tmp_path` fixtures and `capsys` for stdout capture:
 
-- Verify `--dry-run` produces expected stdout for movie files
-- Verify `--dry-run` produces expected stdout for TV files
-- Verify `--dry-run` with `--downmix-audio` shows `[COPY + FFMPEG]` labels
-- Verify zero filesystem side effects (target dir remains empty)
-- Verify refactored `prepare_*` functions produce correct operation lists without disk access
+- **Dry-run movie output**: Create temp source with video files, run `organize_movies(dry_run=True)`, capture stdout, assert grouped tree format matches expected output.
+- **Dry-run TV output**: Same approach for `organize_tv_shows(dry_run=True)`.
+- **Dry-run auto mode**: Verify combined output with `=== Movies ===` / `=== TV Shows ===` headings.
+- **`--downmix-audio` labels**: Verify `[COPY + FFMPEG]` for main files vs `[MOVE]` for extras.
+- **Zero side effects**: Assert target directory is empty after dry-run (no dirs or files created).
+- **No files found**: Verify "No video files found" message for empty source dir.
+- **Pure prepare functions**: Call `prepare_file_operations()` and `prepare_tv_operations()` with test data, verify correct operation lists returned. "Without disk access" verified by using a non-existent target path — the function should not fail since it no longer touches the filesystem.
+- **In-memory duplicate detection**: Verify that when multiple files would map to the same target name, the counter suffix is applied correctly.
 
 No FFmpeg required for any dry-run tests.
