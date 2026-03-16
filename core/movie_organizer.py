@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from tqdm import tqdm
 
+from .dry_run import render_dry_run_movies
 from .file_processor import process_with_ffmpeg_async
 from .movie_parser import parse_movie_info
 
@@ -113,8 +114,6 @@ async def organize_movies(source_dir, target_dir, downmix_audio=False, dry_run=F
     When dry_run=True, returns (move_count, ffmpeg_count) tuple.
     Set print_summary=False when called from organize_mixed_content (which prints its own combined summary).
     """
-    from .dry_run import render_dry_run_movies
-
     # Scan source directory
     all_files = scan_source_directory(source_dir)
 

@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from tqdm import tqdm
 
+from .dry_run import render_dry_run_tv
 from .file_processor import process_with_ffmpeg_async
 from .tv_parser import get_real_extension, parse_tv_info
 
@@ -151,8 +152,6 @@ async def organize_tv_shows(source_dir, target_dir, downmix_audio=False, dry_run
     When dry_run=True, returns (move_count, ffmpeg_count) tuple.
     Set print_summary=False when called from organize_mixed_content (which prints its own combined summary).
     """
-    from .dry_run import render_dry_run_tv
-
     # Scan source directory
     all_files = scan_source_directory(source_dir)
 

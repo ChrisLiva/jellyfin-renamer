@@ -545,7 +545,8 @@ async def test_movie_dry_run_no_side_effects(tmp_path):
     # Create a dummy video file
     (source_dir / "Inception.2010.1080p.BluRay.mkv").write_bytes(b"\x00" * 100)
 
-    await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+    result = await organize_movies(str(source_dir), str(target_dir), dry_run=True)
+    assert result == (1, 0)
 
     # Target should be empty
     assert list(target_dir.iterdir()) == []
@@ -563,7 +564,8 @@ async def test_tv_dry_run_no_side_effects(tmp_path):
 
     (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
 
-    await organize_tv_shows(str(source_dir), str(target_dir), dry_run=True)
+    result = await organize_tv_shows(str(source_dir), str(target_dir), dry_run=True)
+    assert result == (1, 0)
 
     assert list(target_dir.iterdir()) == []
     assert (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").exists()
