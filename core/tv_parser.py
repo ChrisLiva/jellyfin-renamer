@@ -52,6 +52,10 @@ def parse_tv_info(filename):
     year = info.get("year")
     resolution = info.get("screen_size")
 
+    # Sometimes the episode number is guessed as a an additional season.
+    if isinstance(season, list):
+        season, episode = season[:2]
+
     # Handle multi-episode detection
     episodes = normalize_episode_range(episode)
 
