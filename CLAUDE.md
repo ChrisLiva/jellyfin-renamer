@@ -10,7 +10,7 @@ Jellyfin Renamer is a Python CLI tool that organizes and renames movie/TV show f
 
 ### Running
 ```bash
-uv run python jellyfin-renamer.py <source> <target> [--content-type {movies,tv,auto}] [--downmix-audio]
+uv run jellyfin-renamer <source> <target> [--content-type {movies,tv,auto}] [--downmix-audio]
 ```
 
 ### Testing
@@ -32,9 +32,9 @@ uv venv && uv sync
 
 ## Architecture
 
-**Entry point**: `jellyfin-renamer.py` — CLI with argparse, routes to organizers based on `--content-type`.
+**Entry point**: `jellyfin_renamer/__main__.py` — CLI with argparse, routes to organizers based on `--content-type`.
 
-**`core/` modules follow a parser → organizer pipeline:**
+**`jellyfin_renamer/core/` modules follow a parser → organizer pipeline:**
 
 - **Parsers** (`movie_parser.py`, `tv_parser.py`) — Extract metadata (title, year, season, episode, resolution, extras) from filenames using `guessit`. `tv_parser.py` also handles content type detection, multi-episode ranges, and extra type categorization (trailers, behind-the-scenes, etc.).
 - **Organizers** (`movie_organizer.py`, `tv_organizer.py`) — Orchestrate the workflow: scan → group files → create directory structure → copy/rename files. Both are async with tqdm progress tracking.

@@ -9,6 +9,12 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
+[project.scripts]
+jellyfin-renamer = "jellyfin_renamer.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jellyfin_renamer"]
+
 [project.optional-dependencies]
 test = [
     "pytest>=8.0.0",
