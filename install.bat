@@ -10,7 +10,7 @@ echo ================================
 echo.
 
 REM Check if we're in the right directory
-if not exist "jellyfin-renamer.py" (
+if not exist "jellyfin_renamer/__init__.py" (
     echo [ERROR] Please run this script from the jellyfin-renamer project directory.
     pause
     exit /b 1
@@ -117,10 +117,10 @@ echo REM Check if UV is available
 echo uv --version ^>nul 2^>^&1
 echo if not errorlevel 1 ^(
 echo     REM Use UV to run the script
-echo     uv run python jellyfin-renamer.py %%*
+echo     uv run jellyfin-renamer %%*
 echo ^) else ^(
 echo     REM Fallback to direct Python execution
-echo     python jellyfin-renamer.py %%*
+echo     cd jellyfin_renamer; python3 __main__.py %%*
 echo ^)
 ) > "%SCRIPT_PATH%"
 
@@ -184,4 +184,4 @@ echo   jellyfin-renamer --help
 echo.
 echo [WARNING] If 'jellyfin-renamer' command is not found, restart your command prompt.
 echo.
-pause 
+pause

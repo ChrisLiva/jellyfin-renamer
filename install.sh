@@ -143,10 +143,10 @@ cd "$PROJECT_DIR"
 # Check if UV is available
 if command -v uv >/dev/null 2>&1; then
     # Use UV to run the script
-    uv run python jellyfin-renamer.py "$@"
+    uv run jellyfin-renamer "$@"
 else
     # Fallback to direct Python execution
-    python3 jellyfin-renamer.py "$@"
+    python3 jellyfin-renamer "$@"
 fi
 EOF
 
@@ -205,7 +205,7 @@ main() {
     print_header
     
     # Check if we're in the right directory
-    if [[ ! -f "jellyfin-renamer.py" ]] || [[ ! -f "pyproject.toml" ]]; then
+    if [[ ! -f "jellyfin_renamer/__init__.py" ]] || [[ ! -f "pyproject.toml" ]]; then
         print_error "Please run this script from the jellyfin-renamer project directory."
         exit 1
     fi
@@ -276,4 +276,4 @@ main() {
 }
 
 # Run main function
-main "$@" 
+main "$@"

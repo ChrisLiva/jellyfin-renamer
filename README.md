@@ -33,7 +33,7 @@ uv venv && uv sync
 ## Usage
 
 ```bash
-uv run python jellyfin-renamer.py <source> <target> [options]
+uv run jellyfin-renamer <source> <target> [options]
 ```
 
 ### Options
@@ -49,7 +49,7 @@ uv run python jellyfin-renamer.py <source> <target> [options]
 Use `--dry-run` to see exactly what the tool will do before it touches your files:
 
 ```bash
-uv run python jellyfin-renamer.py /path/to/media /path/to/jellyfin --dry-run
+uv run jellyfin-renamer /path/to/media /path/to/jellyfin --dry-run
 ```
 
 This prints a grouped tree of all planned moves without writing anything. Once the output looks right, run without `--dry-run` to apply.
@@ -58,14 +58,14 @@ This prints a grouped tree of all planned moves without writing anything. Once t
 
 ```bash
 # Preview (safe — no files are moved)
-uv run python jellyfin-renamer.py /media /jellyfin --dry-run
-uv run python jellyfin-renamer.py /media /jellyfin --dry-run --content-type movies
+uv run jellyfin-renamer /media /jellyfin --dry-run
+uv run jellyfin-renamer /media /jellyfin --dry-run --content-type movies
 
 # Apply
-uv run python jellyfin-renamer.py /media /jellyfin
-uv run python jellyfin-renamer.py /movies /jellyfin --content-type movies
-uv run python jellyfin-renamer.py /tv /jellyfin --content-type tv
-uv run python jellyfin-renamer.py /media /jellyfin --downmix-audio
+uv run jellyfin-renamer /media /jellyfin
+uv run jellyfin-renamer /movies /jellyfin --content-type movies
+uv run jellyfin-renamer /tv /jellyfin --content-type tv
+uv run jellyfin-renamer /media /jellyfin --downmix-audio
 ```
 
 ## Output Structure

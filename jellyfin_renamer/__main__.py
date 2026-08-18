@@ -2,10 +2,10 @@ import argparse
 import asyncio
 import os
 
-from core.common import scan_source_directory
-from core.dry_run import print_dry_run_summary
-from core.movie_organizer import organize_movies
-from core.tv_organizer import organize_tv_shows
+from jellyfin_renamer.core.common import scan_source_directory
+from jellyfin_renamer.core.dry_run import print_dry_run_summary
+from jellyfin_renamer.core.movie_organizer import organize_movies
+from jellyfin_renamer.core.tv_organizer import organize_tv_shows
 
 
 async def organize_mixed_content(source_dir, target_dir, downmix_audio=False, dry_run=False):
@@ -75,7 +75,7 @@ async def organize_mixed_content(source_dir, target_dir, downmix_audio=False, dr
         print_dry_run_summary(total_move, total_ffmpeg)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Organize media files for Jellyfin.")
     parser.add_argument("source_dir", help="Source directory")
     parser.add_argument("target_dir", help="Target directory")
@@ -111,3 +111,7 @@ if __name__ == "__main__":
         asyncio.run(
             organize_mixed_content(args.source_dir, args.target_dir, args.downmix_audio, dry_run=args.dry_run)
         )
+
+
+if __name__ == "__main__":
+    main()

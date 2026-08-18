@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from core.dry_run import render_dry_run_movies, render_dry_run_tv
-from core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
-from core.movie_parser import parse_movie_info
-from core.tv_organizer import group_files_by_series, handle_duplicate_files, organize_tv_shows, prepare_tv_operations
-from core.tv_parser import detect_content_type, parse_tv_info
+from jellyfin_renamer.core.dry_run import render_dry_run_movies, render_dry_run_tv
+from jellyfin_renamer.core.movie_organizer import group_files_by_movie, organize_movies, prepare_file_operations
+from jellyfin_renamer.core.movie_parser import parse_movie_info
+from jellyfin_renamer.core.tv_organizer import group_files_by_series, handle_duplicate_files, organize_tv_shows, prepare_tv_operations
+from jellyfin_renamer.core.tv_parser import detect_content_type, parse_tv_info
 
 
 @pytest.mark.parametrize(
@@ -405,7 +405,7 @@ class TestExtensionHandling:
 
     def test_multiple_extensions_preserve_episode_names(self):
         """Test that extensions in episode names are preserved."""
-        from core.tv_parser import get_base_filename_without_ext, get_real_extension
+        from jellyfin_renamer.core.tv_parser import get_base_filename_without_ext, get_real_extension
 
         filename = "Show.S01E01.episode.name.with.dots.mov.mkv"
 
@@ -584,7 +584,7 @@ def test_dry_run_auto_mode_cli(tmp_path):
     (source_dir / "Breaking.Bad.S01E01.720p.BluRay.x264.mkv").write_bytes(b"\x00" * 100)
 
     result = subprocess.run(
-        ["uv", "run", "python", "jellyfin-renamer.py", str(source_dir), str(target_dir), "--dry-run"],
+        ["uv", "run", "jellyfin-renamer", str(source_dir), str(target_dir), "--dry-run"],
         capture_output=True, text=True,
         cwd=str(pathlib.Path(__file__).parent.parent),
     )
@@ -621,7 +621,7 @@ def test_dry_run_movies_cli(tmp_path):
 
     result = subprocess.run(
         [
-            "uv", "run", "python", "jellyfin-renamer.py",
+            "uv", "run", "jellyfin-renamer",
             str(source_dir), str(target_dir),
             "--content-type", "movies", "--dry-run",
         ],
@@ -646,7 +646,7 @@ def test_dry_run_tv_cli(tmp_path):
 
     result = subprocess.run(
         [
-            "uv", "run", "python", "jellyfin-renamer.py",
+            "uv", "run", "jellyfin-renamer",
             str(source_dir), str(target_dir),
             "--content-type", "tv", "--dry-run",
         ],

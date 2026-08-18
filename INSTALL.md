@@ -109,7 +109,7 @@ If the automatic install script doesn't work, you can install manually:
 2. **Install UV**: `pip install uv`
 3. **Install FFmpeg** (optional)
 4. **Install dependencies**: `uv sync`
-5. **Run directly**: `uv run python jellyfin-renamer.py --help`
+5. **Run directly**: `uv run jellyfin-renamer --help`
 
 ## Uninstalling
 
